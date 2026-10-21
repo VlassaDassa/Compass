@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node server.mjs",
     "build": "node build.mjs",
+    "test": "node --test tests/office-model.test.mjs",
     "check": "node --check dist/app.js && node --check dist/data.js && node --check dist/store.js"
   },
   "dependencies": {

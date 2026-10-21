@@ -1,5 +1,7 @@
-import { initialArticles, initialUsers } from './data.js';
-const seed = () => ({articles:structuredClone(initialArticles),users:structuredClone(initialUsers),favorites:['new-workplace','shared-folder'],drafts:{},links:[],settings:{provider:'external',center:'БЦ «Горизонт»'}});
+import { initialArticles, initialUsers,people } from './data.js';
+import {createOffice} from './office-model.js';
+const enrichPeople=()=>people.map((p,i)=>({...p,email:`employee${i+1}@example.test`,personalPhone:`+7 (000) 000-00-${String(i+1).padStart(2,'0')}`}));
+const seed = () => ({articles:structuredClone(initialArticles),users:structuredClone(initialUsers),favorites:['new-workplace','shared-folder'],drafts:{},links:[],settings:{provider:'external',center:'БЦ «Горизонт»'},people:enrichPeople(),office:createOffice(people),demoCredentials:Object.fromEntries(people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]))});
 let db;
 export let state;
 export let persistent = false;
@@ -8,8 +10,12 @@ export async function initialize(){
     db=await new Promise((resolve,reject)=>{const r=indexedDB.open('compass-knowledge-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     const saved=await new Promise((resolve,reject)=>{const r=db.transaction('workspace').objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     state=saved||seed();persistent=true;
-    if(!saved)await persist(state);
-  }catch{state=seed();persistent=false;}
+    // Add the editable office without touching existing articles or drafts.
+    const needsMigration=!state.office||!state.people||!state.demoCredentials;
+    state.people??=enrichPeople();state.office??=createOffice(state.people);
+    state.demoCredentials??=Object.fromEntries(state.people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]));
+    if(!saved||needsMigration)await persist(state);
+  }catch{state??=seed();persistent=false;}
   return state;
 }
 async function persist(next){
@@ -20,7 +26,8 @@ let saving=Promise.resolve();
 export function update(mutator){
   const task=saving.then(async()=>{const next=structuredClone(state);mutator(next);await persist(next);state=next;return state;});saving=task.catch(()=>{});return task;
 }
-export function exportData(){const blob=new Blob([JSON.stringify({schemaVersion:1,exportedAt:new Date().toISOString(),...state},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`compass-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+export function exportSnapshot(){const {demoCredentials,...data}=state;return{schemaVersion:2,exportedAt:new Date().toISOString(),...data};}
+export function exportData(){const blob=new Blob([JSON.stringify(exportSnapshot(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`compass-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export function textContent(html){const doc=new DOMParser().parseFromString(html,'text/html');return doc.body.textContent||'';}
 export function searchArticles(query,items=state.articles){const terms=query.toLocaleLowerCase('ru').trim().split(/\s+/).filter(Boolean);return items.filter(a=>a.status==='published'&&terms.every(t=>(a.title+' '+a.summary+' '+a.tags.join(' ')+' '+textContent(a.body)).toLocaleLowerCase('ru').includes(t)));}
 export function similarArticles(title,exclude){const words=title.toLocaleLowerCase('ru').match(/[а-яёa-z0-9]{4,}/g)||[];if(!words.length)return[];return state.articles.filter(a=>a.id!==exclude&&a.status==='published').map(a=>({article:a,score:words.filter(w=>(a.title+' '+a.summary).toLocaleLowerCase('ru').includes(w)).length/words.length})).filter(x=>x.score>=.4).sort((a,b)=>b.score-a.score).slice(0,3).map(x=>x.article);}
