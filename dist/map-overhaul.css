@@ -1,0 +1,58 @@
+/* Isometric map overhaul: a quiet dark stage with a small amount of depth. */
+.office-plan-panel{background:#0d1a20;border:1px solid #244249;border-radius:20px;box-shadow:0 22px 70px #0008;overflow:hidden}
+.office-map-top{background:#0d1a20;border-bottom:1px solid #203b43;padding:22px 26px 15px}
+.office-map-top>.field-select{background:#152a31;border-color:#2c5155;color:#d8eee9;border-radius:10px}
+.office-mode{background:#091419;border:1px solid #1e3b42;padding:4px;border-radius:10px}
+.office-mode button{color:#75959a;border-radius:7px;font-size:13px;padding:9px 12px}
+.office-mode button.active{background:#1b4848;color:#d6f5e7;box-shadow:0 5px 16px #0005}
+.office-search-row{background:#0d1a20;padding:0 26px 19px}
+.office-search-row .search-field{background:#09151a;border-color:#2a4b52;border-radius:11px;min-height:43px}
+.office-search-row .search-field input{font-size:13px}
+.office-viewport.isometric{height:650px;min-height:500px;background:#071116;border-block:1px solid #214149;isolation:isolate}
+.office-viewport.isometric:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 44%,#173b3e99 0,#0b202866 28%,transparent 65%),linear-gradient(135deg,#09181e,#061015 58%,#0b1c21);z-index:0;pointer-events:none}
+.office-viewport.isometric:after{content:"";position:absolute;inset:0;background-image:radial-gradient(#8bcfc01c 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);z-index:0;pointer-events:none}
+.office-viewport.isometric .office-svg{z-index:1;filter:drop-shadow(0 22px 28px #0009)}
+.office-viewport.isometric .iso-floor-shell{filter:drop-shadow(0 18px 12px #000b)}
+.office-viewport.isometric .iso-floor-face{fill:#0c2329;stroke:#2b5b5d;stroke-width:1}
+.office-viewport.isometric .iso-floor-face-front{fill:#0a1c22}
+.office-viewport.isometric .iso-floor-edge{fill:none;stroke:#69a39e;stroke-opacity:.6;stroke-width:1.5;stroke-dasharray:7 8}
+.office-viewport.isometric .iso-extrusion{pointer-events:none}
+.office-viewport.isometric .iso-extrusion .iso-face{fill:#112b32;stroke:#2b5559;stroke-width:1}
+.office-viewport.isometric .iso-extrusion .iso-face-right{fill:#0e252c}
+.office-viewport.isometric .iso-extrusion .iso-face-front{fill:#0a1c22}
+.office-viewport.isometric .iso-extrusion .iso-edge{fill:none;stroke:#4e8581;stroke-opacity:.65;stroke-width:1.2}
+.office-viewport.isometric .map-floor-fill{fill:#102b32;stroke:#4d8582;stroke-width:2}
+.office-viewport.isometric .map-floor-edge{stroke:#8bc9bd;stroke-opacity:.8;stroke-width:1.5;stroke-dasharray:5 8}
+.office-viewport.isometric .map-floor-label{fill:#b8e2d5;font-size:15px;font-weight:700;letter-spacing:1.5px}
+.office-viewport.isometric .office-room.map-zone>.office-room-bg{fill:#152d34;stroke:#47736f;stroke-width:2;filter:none}
+.office-viewport.isometric .office-room.map-zone .room-floor-grain{opacity:.52;mix-blend-mode:screen}
+.office-viewport.isometric .office-room.map-zone .office-room-title-bg{fill:#0c2027e8;stroke:#315c5e;stroke-width:1}
+.office-viewport.isometric .office-room.map-zone .office-room-name{fill:#e4f4ed;font-size:19px;font-weight:750;letter-spacing:.1px;paint-order:stroke;stroke:#0d2026;stroke-width:3px}
+.office-viewport.isometric .office-room.map-zone .office-room-type{fill:#8fbab0;font-size:11px;font-weight:700;letter-spacing:1px}
+.office-viewport.isometric .office-room.map-zone .wall-shadow{stroke:#031015cc;stroke-width:20}
+.office-viewport.isometric .office-room.map-zone .wall-body{stroke:#487372;stroke-width:12}
+.office-viewport.isometric .office-room.map-zone .wall-highlight{stroke:#b1e2d06e;stroke-width:1.5}
+.office-viewport.isometric .office-room.map-zone.open-zone>.office-room-bg{fill:#19363a;stroke:#5b9790;stroke-width:1.5;stroke-dasharray:8 7}
+.office-viewport.isometric .office-room.map-zone.open-zone .room-walls{display:none}
+.office-viewport.isometric .office-room.map-zone.selected>.office-room-bg{stroke:#d9ef73;stroke-width:3}
+.office-viewport.isometric .office-room.map-zone [data-room-drag]:focus-visible text{fill:#f4ffe8}
+.office-viewport.isometric .office-seat .workstation-art,.office-viewport.isometric .map-object .furniture-art{filter:drop-shadow(0 7px 4px #02070a99)}
+.office-viewport.isometric .office-seat-person{fill:#e9fff6;font-size:16px;font-weight:650;paint-order:stroke;stroke:#0d2026;stroke-width:4px}
+.office-viewport.isometric .office-seat-number{fill:#a8d6ca;font-size:12px;font-weight:700;paint-order:stroke;stroke:#0d2026;stroke-width:3px}
+.office-viewport.isometric .office-seat.selected .office-desk-body,.office-viewport.isometric .office-seat:hover .office-desk-body{fill:#287f75;stroke:#d7f39d;stroke-width:2.5}
+.office-viewport.isometric .office-seat.free .office-desk-body{fill:#1a353b;stroke:#5e8989}
+.office-viewport.isometric .map-object .object-label{fill:#cbe8df;font-size:13px;font-weight:650;paint-order:stroke;stroke:#0a1a20;stroke-width:4px}
+.office-viewport.isometric .map-object .object-hit{stroke:transparent;stroke-width:13px}
+.office-viewport.isometric .map-object.selected .object-hit,.office-viewport.isometric .map-object:focus-visible .object-hit{stroke:#d9ef73;stroke-width:2}
+.office-viewport.isometric .map-move-grip rect{fill:#123b3b;stroke:#d9ef73}
+.office-viewport.isometric .office-zoom-controls{background:#0b1d23ee;border-color:#37615f;box-shadow:0 10px 28px #0009}
+.office-viewport.isometric .office-zoom-controls .icon-btn{color:#c4f2db}
+.office-map-bottom{background:#0d1a20;border-top:1px solid #203b43;color:#80a49f;padding:16px 26px}
+.office-map-bottom>.office-map-help{color:#a8d4c4}
+.office-seat-list{background:#0d1a20}
+.office-seat-list section h3{color:#a8d8c8;border-color:#244249}
+.office-seat-row{border-color:#1f3940}
+.office-seat-row:hover{background:#153239}
+.office-seat-row small{color:#88aaa9}
+@media(min-width:1800px){.office-viewport.isometric{height:720px}}
+@media(max-width:760px){.office-viewport.isometric{height:480px;min-height:390px}.office-map-top,.office-search-row,.office-map-bottom{padding-left:15px;padding-right:15px}.office-viewport.isometric .office-room.map-zone .office-room-name{font-size:21px}.office-viewport.isometric .office-seat-person{font-size:19px}}

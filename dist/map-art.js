@@ -8,7 +8,7 @@ export const mapArtDefs=`
 <linearGradient id="map-fabric" x2=".25" y2="1"><stop stop-color="#73a6b2"/><stop offset="1" stop-color="#3e6876"/></linearGradient>
 <linearGradient id="map-screen" x2=".7" y2="1"><stop stop-color="#b8e5e7"/><stop offset=".45" stop-color="#5f9da8"/><stop offset="1" stop-color="#2e6675"/></linearGradient>
 <linearGradient id="map-glass" x2="0" y2="1"><stop stop-color="#e6f6f5"/><stop offset=".5" stop-color="#8fcbd0"/><stop offset="1" stop-color="#4c8b99"/></linearGradient>
-<pattern id="map-floorboards" width="160" height="64" patternUnits="userSpaceOnUse"><rect width="160" height="64" fill="#eadfce"/><path d="M0 0H160M0 32H160M80 0V32M20 32V64" stroke="#9e896e" stroke-opacity=".12"/><path d="M0 2H160M0 34H160" stroke="#ffffff" stroke-opacity=".6"/></pattern>
+<pattern id="map-floorboards" width="160" height="64" patternUnits="userSpaceOnUse"><rect width="160" height="64" fill="#172b32"/><path d="M0 0H160M0 32H160M80 0V32M20 32V64" stroke="#6b9690" stroke-opacity=".13"/><path d="M0 2H160M0 34H160" stroke="#b4e0cf" stroke-opacity=".08"/></pattern>
 <filter id="map-soft-shadow" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#34505b" flood-opacity=".24"/></filter>
 `;
 
