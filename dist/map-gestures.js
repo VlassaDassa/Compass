@@ -2,7 +2,7 @@ import {snapSeatPosition,validateSeatPosition,snapObjectPosition,validateObject,
 import {resizeLayout,validateLayoutResize} from './map-resize.js';
 
 /** SVG coordinates stay independent of screen size and the current zoom. */
-export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,select,render,report,isActive}){
+export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,select,render,report,isActive}){
   let drag=null,pinch=null;
   const preview=()=>{
     if(drag?.seat){
@@ -12,7 +12,8 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       const label=el?.querySelector('.seat-coordinate');
       if(label)label.textContent=`X ${drag.seat.x} · Y ${drag.seat.y}`;
     }
-    if(drag?.room)svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${drag.room.x} ${drag.room.y})`);
+    if(drag?.room&&previewRoom)previewRoom(drag.room);
+    if(drag?.room&&!previewRoom)svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${drag.room.x} ${drag.room.y})`);
     if(drag?.object)svg.querySelector(`[data-object="${drag.object.id}"]`)?.setAttribute('transform',`translate(${drag.object.x} ${drag.object.y})`);
     if(drag?.resize)previewResize?.({floor:drag.floor,origin:{x:0,y:0}});
     svg.querySelectorAll('.map-object.dragging,.office-room.drag-invalid').forEach(el=>el.classList.remove('dragging','drag-invalid'));
@@ -97,7 +98,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       const x=Math.max(20,Math.round((drag.room.x+dx*drag.point.scale)/20)*20),y=Math.max(20,Math.round((drag.room.y+dy*drag.point.scale)/20)*20);
       drag.nextRoom={...drag.room,x,y};
       drag.error='';try{validateRoom(getFloor(),drag.nextRoom);}catch(error){drag.error=error.message;}
-      svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${x} ${y})`);
+      if(previewRoom){svg.setPointerCapture?.(event.pointerId);previewRoom(drag.nextRoom);}else svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${x} ${y})`);
       svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.classList.toggle('drag-invalid',!!drag.error);
       report(drag.error||`Зона · X ${x} · Y ${y}`,!!drag.error);
     }else{

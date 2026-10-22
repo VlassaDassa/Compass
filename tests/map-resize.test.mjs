@@ -49,7 +49,7 @@ test('dragging through an opposite edge clamps the size and keeps it anchored',(
 });
 test('all entity boundaries have continuous resize hit areas in edit mode only',()=>{
   const f=plan(),options={escape:x=>x,seatSvg:()=>''};
-  const read=sceneSvg(f,{editing:false},options),edit=sceneSvg(f,{editing:true},options);
+  const read=sceneSvg(f,{editing:false},options),edit=sceneSvg(f,{editing:true,objectId:'o'},options);
   assert.ok(!read.includes('data-resize-kind'));
   for(const kind of ['floor','room','object'])for(const axis of ['n','ne','e','se','s','sw','w','nw'])assert.ok(edit.includes(`data-resize-kind="${kind}" data-resize-id="${kind==='floor'?'f':kind==='room'?'r':'o'}" data-resize-axis="${axis}"`));
   assert.ok(edit.includes('map-wood'));assert.ok(edit.includes('furniture-art'));

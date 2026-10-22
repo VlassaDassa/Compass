@@ -5,8 +5,13 @@
 .editing .map-edit-grid{display:block}
 .map-floor-edge{stroke:#626a70;stroke-dasharray:5 7;stroke-width:1;vector-effect:non-scaling-stroke}
 .map-floor-label{fill:#b5bbc1;letter-spacing:1px;font-size:15px}
-.office-room.map-zone>.office-room-bg{fill:var(--zone-fill);stroke:#8d9394;stroke-width:10;filter:drop-shadow(0 4px 3px #070a0d88)}
-.office-room.map-zone.selected>.office-room-bg{stroke:#a7aaa4;stroke-width:10}
+.office-room.map-zone>.office-room-bg{fill:var(--zone-fill);stroke:none;filter:drop-shadow(0 4px 3px #070a0d88)}
+.office-room.map-zone.selected>.office-room-bg{stroke:none}
+.room-walls{fill:none;pointer-events:none;stroke-linecap:butt;stroke-linejoin:miter}
+.wall-shadow{stroke:#0c111666;stroke-width:15;transform:translateY(2px)}
+.wall-body{stroke:#8d9394;stroke-width:10}
+.wall-highlight{stroke:#d9dbce77;stroke-width:1.2;transform:translate(1.5px,-1.5px)}
+.rotated-room-caption{transform:translateY(-57px)}
 .room-floor-grain{pointer-events:none;opacity:.7}
 .room-wall-inset{fill:none;stroke:#e5e5d955;stroke-width:1;pointer-events:none}
 .office-room.map-zone .office-room-title-bg{fill:#292d30b3;stroke:none}
@@ -27,6 +32,13 @@
 .map-object:hover .object-symbol{filter:brightness(1.08)}
 .map-object.selected .object-hit,.map-object:focus-visible .object-hit{stroke:#e8c77f;fill:none;stroke-width:1.5}
 .editing .map-object.selected .object-hit{stroke:none;fill:none}
+.map-object .object-hit{pointer-events:all;stroke:transparent;stroke-width:12px;vector-effect:non-scaling-stroke}
+.map-object .object-symbol{pointer-events:none}
+.map-move-grip{cursor:grab;pointer-events:all}
+.map-move-grip rect{fill:#252b32;stroke:#e5c77e;stroke-width:1.2}
+.map-move-grip path{fill:none;stroke:#efd595;stroke-width:2.2;stroke-linecap:round;pointer-events:none}
+.map-move-grip:hover rect{fill:#484337}
+.map-object.dragging .map-move-grip{cursor:grabbing}
 .map-object.kind-door:not(.selected) .object-label,.map-object.kind-window:not(.selected) .object-label{display:none}
 .map-marker{background:#ae9878;border-color:#d3c1a4}
 .map-marker.landmark{background:#79868e;border-color:#abb6bc}

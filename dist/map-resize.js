@@ -7,7 +7,8 @@ export function resizeLayout(floor,kind,id,axis,dx,dy){
   const item=kind==='floor'?next:kind==='room'?next.rooms.find(r=>r.id===id):kind==='seat'?next.seats.find(s=>s.id===id):next.objects.find(o=>o.id===id);
   if(!item)throw new Error('Объект не найден.');
   const size=kind==='object'?objectSize(item):kind==='seat'?seatSize(item):item;
-  const min=kind==='floor'?{width:400,height:350}:kind==='room'?{width:40,height:40}:kind==='seat'?{width:60,height:45}:{width:12,height:12};
+  const rotatedSeat=kind==='seat'&&item.rotation%180;
+  const min=kind==='floor'?{width:400,height:350}:kind==='room'?{width:40,height:40}:kind==='seat'?(rotatedSeat?{width:45,height:60}:{width:60,height:45}):{width:12,height:12};
   const max=kind==='floor'?6000:kind==='room'?5000:kind==='seat'?600:1500;
   const delta={x:Math.round(dx/10)*10,y:Math.round(dy/10)*10};
   const round=value=>Math.round(value*100)/100;
@@ -30,7 +31,7 @@ export function resizeLayout(floor,kind,id,axis,dx,dy){
     for(const object of next.objects||[])if(!object.roomId){object.x=round(object.x-shift.x);object.y=round(object.y-shift.y);}
   }else{
     item.x=round(item.x+shift.x);item.y=round(item.y+shift.y);
-    if(kind==='object'&&item.rotation%180){item.width=height;item.height=width;}else{item.width=width;item.height=height;}
+    if((kind==='object'||kind==='seat')&&item.rotation%180){item.width=height;item.height=width;}else{item.width=width;item.height=height;}
     if(kind==='room'){
       // Resizing a frame does not drag the furniture inside it.
       for(const child of [...next.seats,...(next.objects||[])])if(child.roomId===id){child.x=round(child.x-shift.x);child.y=round(child.y-shift.y);}
