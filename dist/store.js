@@ -1,5 +1,6 @@
 import { initialArticles, initialUsers,people } from './data.js';
-import {createOffice} from './office-model.js';
+import {createOffice,upgradeOffice} from './office-model.js';
+import {redactVault} from './vault-model.js';
 const enrichPeople=()=>people.map((p,i)=>({...p,email:`employee${i+1}@example.test`,personalPhone:`+7 (000) 000-00-${String(i+1).padStart(2,'0')}`}));
 const seed = () => ({articles:structuredClone(initialArticles),users:structuredClone(initialUsers),favorites:['new-workplace','shared-folder'],drafts:{},links:[],settings:{provider:'external',center:'БЦ «Горизонт»'},people:enrichPeople(),office:createOffice(people),demoCredentials:Object.fromEntries(people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]))});
 let db;
@@ -11,12 +12,14 @@ export async function initialize(){
     const saved=await new Promise((resolve,reject)=>{const r=db.transaction('workspace').objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     state=saved||seed();persistent=true;
     // Add the editable office without touching existing articles or drafts.
-    const needsMigration=!state.office||!state.people||!state.demoCredentials;
+    const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault;
     state.people??=enrichPeople();state.office??=createOffice(state.people);
+    upgradeOffice(state.office);
+    state.vault??=[{id:'demo-share',title:'Общая папка · пример',notes:'Демонстрационная запись. Замените своими несекретными тестовыми данными.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'path',label:'Сетевой путь',value:'\\\\files.example.test\\support',secret:false},{id:'contact',label:'Ответственный',value:'Демо · IT-поддержка',secret:false}]},{id:'demo-service',title:'Внутренний сервис · пример',notes:'В одной записи могут быть ссылки, логины, заметки и скрытые значения.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'url',label:'URL',value:'https://service.example.test',secret:false},{id:'login',label:'Логин',value:'support.demo',secret:false},{id:'password',label:'Пароль · демо',value:'Demo-Only-Vault!',secret:true}]}];state.vaultTrash??=[];
     state.demoCredentials??=Object.fromEntries(state.people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]));
     if(!saved||needsMigration)await persist(state);
   }catch{state??=seed();persistent=false;}
-  return state;
+  state.vault??=[];state.vaultTrash??=[];return state;
 }
 async function persist(next){
   if(!db)throw new Error('Хранилище браузера недоступно. Разрешите локальное хранение данных.');
@@ -26,7 +29,7 @@ let saving=Promise.resolve();
 export function update(mutator){
   const task=saving.then(async()=>{const next=structuredClone(state);mutator(next);await persist(next);state=next;return state;});saving=task.catch(()=>{});return task;
 }
-export function exportSnapshot(){const {demoCredentials,...data}=state;return{schemaVersion:2,exportedAt:new Date().toISOString(),...data};}
+export function exportSnapshot(){const {demoCredentials,vault,vaultTrash,...data}=state;return{schemaVersion:3,exportedAt:new Date().toISOString(),...data,vault:redactVault(vault||[])};}
 export function exportData(){const blob=new Blob([JSON.stringify(exportSnapshot(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`compass-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export function textContent(html){const doc=new DOMParser().parseFromString(html,'text/html');return doc.body.textContent||'';}
 export function searchArticles(query,items=state.articles){const terms=query.toLocaleLowerCase('ru').trim().split(/\s+/).filter(Boolean);return items.filter(a=>a.status==='published'&&terms.every(t=>(a.title+' '+a.summary+' '+a.tags.join(' ')+' '+textContent(a.body)).toLocaleLowerCase('ru').includes(t)));}

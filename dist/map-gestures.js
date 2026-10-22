@@ -1,7 +1,8 @@
-import {snapSeatPosition,validateSeatPosition} from './office-model.js';
+import {snapSeatPosition,validateSeatPosition,snapObjectPosition,validateObject,validateRoom,validateFloorSize} from './office-model.js';
+import {previewSceneSize} from './map-scene.js';
 
 /** SVG coordinates stay independent of screen size and the current zoom. */
-export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,render,report,isActive}){
+export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveFloor,select,render,report,isActive}){
   let drag=null,pinch=null;
   const preview=()=>{
     if(drag?.seat){
@@ -12,6 +13,10 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       if(label)label.textContent=`X ${drag.seat.x} · Y ${drag.seat.y}`;
     }
     if(drag?.room)svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${drag.room.x} ${drag.room.y})`);
+    if(drag?.object)svg.querySelector(`[data-object="${drag.object.id}"]`)?.setAttribute('transform',`translate(${drag.object.x} ${drag.object.y})`);
+    if(drag?.resize)previewSceneSize(svg,drag.resize.kind,drag.resize.id,drag.resize.width,drag.resize.height);
+    svg.querySelectorAll('.map-object.dragging,.office-room.drag-invalid').forEach(el=>el.classList.remove('dragging','drag-invalid'));
+    svg.classList?.remove('map-resize-invalid');
   };
   svg.addEventListener('pointerenter',()=>map.canvasHovered=true);
   svg.addEventListener('pointerleave',()=>map.canvasHovered=false);
@@ -26,12 +31,21 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       drag=null;map.moved=true;map.dragging=false;
       return;
     }
+    if(map.gestures.size>2)return;
     map.moved=false;
     const point=toWorld(event.clientX,event.clientY),floor=getFloor();
     const editable=map.editing&&!map.spacePanning&&map.gestures.size===1;
-    const seatId=editable?event.target.closest('.office-seat')?.dataset.seat:null;
-    const roomId=editable&&!seatId?event.target.closest('[data-room-drag]')?.dataset.roomDrag:null;
-    drag={start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null};
+    const handle=editable?event.target.closest('[data-resize-kind]'):null;
+    const seatId=editable&&!handle?event.target.closest('.office-seat')?.dataset.seat:null;
+    const objectId=editable&&!handle&&!seatId?event.target.closest('[data-object]')?.dataset.object:null;
+    const zone=editable&&!handle&&!seatId&&!objectId?event.target.closest('[data-room-shape]'):null;
+    const roomId=zone?.dataset.roomShape||(!handle&&!objectId&&editable&&!seatId?event.target.closest('[data-room-drag]')?.dataset.roomDrag:null);
+    const sized=handle?(handle.dataset.resizeKind==='floor'?floor:floor.rooms.find(r=>r.id===handle.dataset.resizeId)):null;
+    drag={start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,resize:sized?{kind:handle.dataset.resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis,...structuredClone(sized)}:null};
+    if(handle&&handle.dataset.resizeKind==='room')select?.('room',sized.id);
+    else if(seatId)select?.('seat',seatId);
+    else if(objectId)select?.('object',objectId);
+    else if(roomId)select?.('room',roomId);
     if(drag.seat){
       map.seatId=drag.seat.id;
       svg.querySelectorAll('.office-seat').forEach(el=>el.classList.toggle('selected',el.dataset.seat===seatId));
@@ -49,7 +63,21 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     if(Math.hypot(dx,dy)>5)map.moved=true;
     if(!map.moved)return;
     map.dragging=true;
-    if(drag.seat){
+    if(drag.resize){
+      const item=drag.resize,width=item.axis==='s'?item.width:Math.max(item.kind==='floor'?400:40,Math.min(item.kind==='floor'?6000:5000,Math.round((item.width+dx*drag.point.scale)/20)*20)),height=item.axis==='e'?item.height:Math.max(item.kind==='floor'?350:40,Math.min(item.kind==='floor'?6000:5000,Math.round((item.height+dy*drag.point.scale)/20)*20));
+      drag.nextSize={...item,width,height};drag.error='';
+      try{if(item.kind==='floor')validateFloorSize(getFloor(),width,height);else validateRoom(getFloor(),{...item,width,height});}catch(error){drag.error=error.message;}
+      previewSceneSize(svg,item.kind,item.id,width,height);svg.classList.toggle('map-resize-invalid',!!drag.error);
+      report(drag.error||`${item.kind==='floor'?'План':'Зона'} · ${width} × ${height}`,!!drag.error);
+    }else if(drag.object){
+      const horizontal=Math.abs(dx)>=Math.abs(dy);if(event.shiftKey){if(horizontal)dy=0;else dx=0;}
+      const point=snapObjectPosition(getFloor(),drag.object.id,drag.object.x+dx*drag.point.scale,drag.object.y+dy*drag.point.scale);
+      if(event.shiftKey){if(horizontal)point.y=drag.object.y;else point.x=drag.object.x;}
+      drag.nextObject={...drag.object,...point};drag.error='';
+      try{validateObject(getFloor(),drag.nextObject);}catch(error){drag.error=error.message;}
+      const el=svg.querySelector(`[data-object="${drag.object.id}"]`);el.setAttribute('transform',`translate(${point.x} ${point.y})`);el.classList.add('dragging');
+      report(drag.error||`${drag.object.name} · X ${point.x} · Y ${point.y}`,!!drag.error);
+    }else if(drag.seat){
       const horizontal=Math.abs(dx)>=Math.abs(dy);
       if(event.shiftKey){if(horizontal)dy=0;else dx=0;}
       const point=snapSeatPosition(getFloor(),drag.seat.id,drag.seat.x+dx*drag.point.scale,drag.seat.y+dy*drag.point.scale);
@@ -64,8 +92,10 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     }else if(drag.room){
       const x=Math.max(20,Math.round((drag.room.x+dx*drag.point.scale)/20)*20),y=Math.max(20,Math.round((drag.room.y+dy*drag.point.scale)/20)*20);
       drag.nextRoom={...drag.room,x,y};
+      drag.error='';try{validateRoom(getFloor(),drag.nextRoom);}catch(error){drag.error=error.message;}
       svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${x} ${y})`);
-      report(`Кабинет · X ${x} · Y ${y}`);
+      svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.classList.toggle('drag-invalid',!!drag.error);
+      report(drag.error||`Зона · X ${x} · Y ${y}`,!!drag.error);
     }else{
       map.camera={...drag.camera,x:drag.camera.x-dx*drag.point.scale,y:drag.camera.y-dy*drag.point.scale};applyCamera();
     }
@@ -76,16 +106,23 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     if(event.target.hasPointerCapture?.(event.pointerId))event.target.releasePointerCapture(event.pointerId);
     if(map.gestures.size<2)pinch=null;
     drag=null;map.dragging=false;
+    svg.classList?.remove('map-resize-invalid');
     if(event.type==='pointercancel'){if(isActive())render();return;}
     if(!moved||!finished)return;
     try{
-      if(finished.nextSeat){
-        if(finished.error)throw new Error(finished.error);
+      if(finished.error)throw new Error(finished.error);
+      if(finished.nextSize){
+        if(finished.resize.kind==='floor')await saveFloor(finished.nextSize.width,finished.nextSize.height);
+        else{const {kind,axis,...room}=finished.nextSize;await saveRoom(room);}
+        if(isActive()){render();report(`Размер сохранён · ${finished.nextSize.width} × ${finished.nextSize.height}`);}
+      }else if(finished.nextObject){
+        await saveObject(finished.nextObject);if(isActive()){render();report('Положение объекта сохранено');}
+      }else if(finished.nextSeat){
         await saveSeat(finished.seat.id,finished.nextSeat);
         if(isActive()){render();report(`Сохранено · X ${finished.nextSeat.x} · Y ${finished.nextSeat.y}`);}
       }else if(finished.nextRoom){
         await saveRoom(finished.nextRoom);
-        if(isActive()){render();report('Положение кабинета сохранено');}
+        if(isActive()){render();report('Положение зоны сохранено');}
       }
     }catch(error){if(isActive()){render();report(error.message,true);}}
   };

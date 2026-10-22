@@ -1,8 +1,12 @@
 import {categories,glossary} from './data.js';
+import {installCopying} from './copy-utils.js';
+import {mountVault,disposeVault,resolveVaultValue} from './vault.js';
 import {mountMap,mountPeople,disposeOffice,hideOfficeSecrets} from './office.js';
 import {initialize,state,update,persistent,searchArticles,similarArticles,sanitize,textContent,exportData} from './store.js';
 
 const icons={
+ expand:'<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l6 6m4 4 6 6M20 4l-6 6M10 14l-6 6"/>',
+ rotate:'<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>',
  more:'<circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/>',
  compass:'<path d="m17 7-3 7-7 3 3-7z"/><circle cx="12" cy="12" r="9"/>',
  home:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -43,7 +47,7 @@ let page='',params=new URLSearchParams(),editorInstance=null,editorModule=null,d
 export function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),4200);}
 async function safely(fn){try{await fn();}catch(e){console.error(e);toast(e.message||'Не удалось выполнить действие. Попробуйте ещё раз.');}}
 const navItems=[['','home','Обзор'],['knowledge','book','База знаний'],['favorites','bookmark','Избранное'],['map','map','Карта офиса'],['people','users','Сотрудники']];
-const extraNav=[['assistant','sparkles','ИИ-помощник'],['resources','link','Полезные ссылки'],['glossary','help','Словарь терминов']];
+const extraNav=[['assistant','sparkles','ИИ-помощник'],['vault','lock','Хранилище'],['resources','link','Полезные ссылки'],['glossary','help','Словарь терминов']];
 const navLink=([href,i,label],mobile=false)=>`<a href="#/${href}" class="${mobile?'':'nav-link '}${(page===href||(href==='knowledge'&&['article','editor','start'].includes(page)))?'active':''}" ${page===href?'aria-current="page"':''}>${icon(i)}<span>${label}</span>${!mobile&&href==='knowledge'?`<span class="count">${published().length}</span>`:''}${!mobile&&href==='assistant'?'<span class="count">β</span>':''}</a>`;
 function shell(){
  const label=[...navItems,...extraNav,['settings','settings','Настройки'],['article','book','База знаний'],['editor','edit','Редактор статьи'],['start','rocket','Первые шаги']].find(x=>x[0]===page)?.[2]||'Обзор';
@@ -221,10 +225,10 @@ async function route(){
  const ticket=++routeTicket;
  clearTimeout(draftTimer);
  if(editorInstance){await saveDraft();editorInstance.destroy();editorInstance=null;}
- closeModal();closeMenu();disposeOffice();
+ closeModal();closeMenu();disposeOffice();disposeVault();
  const [path,query]=location.hash.replace(/^#\/?/,'').split('?');const parts=path.split('/');page=parts[0]||'';currentArticleId=parts[1]||null;params=new URLSearchParams(query||'');
  shell();window.scrollTo(0,0);
- switch(page){case '':renderHome();break;case 'knowledge':case 'favorites':renderLibrary();break;case 'article':renderArticle();break;case 'editor':await renderEditor();break;case 'people':renderPeople();break;case 'map':renderMap();break;case 'resources':renderResources();break;case 'glossary':renderGlossary();break;case 'assistant':renderAssistant();break;case 'settings':renderSettings();break;case 'start':renderStart();break;default:$('#main-content').innerHTML=emptyState('Такой страницы пока нет','Перейдите в базу знаний или вернитесь на главную.','compass','На главную','#/');}
+ switch(page){case '':renderHome();break;case 'knowledge':case 'favorites':renderLibrary();break;case 'article':renderArticle();break;case 'editor':await renderEditor();break;case 'people':renderPeople();break;case 'map':renderMap();break;case 'vault':mountVault({titleRow,footer,esc,icon,showModal,closeModal,toast});break;case 'resources':renderResources();break;case 'glossary':renderGlossary();break;case 'assistant':renderAssistant();break;case 'settings':renderSettings();break;case 'start':renderStart();break;default:$('#main-content').innerHTML=emptyState('Такой страницы пока нет','Перейдите в базу знаний или вернитесь на главную.','compass','На главную','#/');}
  if(ticket!==routeTicket)return;
  document.title=`${page==='article'&&article(currentArticleId)?article(currentArticleId).title+' — ':''}Компас · база знаний IT-поддержки`;
 }
@@ -232,5 +236,6 @@ window.addEventListener('hashchange',()=>safely(route));
 window.addEventListener('pagehide',()=>{if(editorInstance){clearTimeout(draftTimer);saveDraft().catch(()=>{});}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&editorInstance)safely(saveDraft);});
 await initialize();
+installCopying({toast,resolveSecret:id=>state.demoCredentials[id],resolveVault:resolveVaultValue});
 await safely(route);
 if(!persistent)toast('Хранилище браузера недоступно. Изменения пока нельзя сохранить.');

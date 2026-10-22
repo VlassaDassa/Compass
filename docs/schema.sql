@@ -50,6 +50,8 @@ CREATE TABLE employees (
   extension text,
   notes text NOT NULL DEFAULT '',
   notes_updated_at timestamptz,
+  employment_status text NOT NULL DEFAULT 'active' CHECK(employment_status IN ('active','dismissed')),
+  dismissed_at date,
   credential_reference text -- ID записи в корпоративном хранилище, не сам пароль
 );
 CREATE TABLE office_floors (
@@ -66,9 +68,10 @@ CREATE TABLE office_rooms (
   id uuid PRIMARY KEY,
   floor_id uuid NOT NULL REFERENCES office_floors,
   name text NOT NULL,
-  room_type text NOT NULL CHECK(room_type IN ('office','open','meeting','printing')),
+  color text NOT NULL DEFAULT 'teal',
+  open_area boolean NOT NULL DEFAULT false,
   x integer NOT NULL CHECK(x >= 20), y integer NOT NULL CHECK(y >= 20),
-  width integer NOT NULL CHECK(width >= 240), height integer NOT NULL CHECK(height >= 200),
+  width integer NOT NULL CHECK(width BETWEEN 40 AND 5000), height integer NOT NULL CHECK(height BETWEEN 40 AND 5000),
   UNIQUE(id,floor_id)
 );
 CREATE TABLE office_workplaces (
@@ -87,3 +90,40 @@ CREATE TABLE office_workplaces (
   FOREIGN KEY(room_id,floor_id) REFERENCES office_rooms(id,floor_id),
   UNIQUE(floor_id,seat_number)
 );
+-- Зоны — свободно названные прямоугольники; open_area разрешает соединённые проходы.
+CREATE TABLE office_objects (
+  id uuid PRIMARY KEY,
+  floor_id uuid NOT NULL REFERENCES office_floors,
+  room_id uuid,
+  name text NOT NULL,
+  kind text NOT NULL,
+  color text NOT NULL,
+  x integer NOT NULL, y integer NOT NULL,
+  width integer NOT NULL CHECK(width BETWEEN 12 AND 1500),
+  height integer NOT NULL CHECK(height BETWEEN 12 AND 1500),
+  rotation integer NOT NULL DEFAULT 0 CHECK(rotation IN (0,90,180,270)),
+  notes text NOT NULL DEFAULT '',
+  ip inet,
+  model text,
+  FOREIGN KEY(room_id,floor_id) REFERENCES office_rooms(id,floor_id)
+);
+CREATE TABLE resource_records (
+  id uuid PRIMARY KEY,
+  title text NOT NULL,
+  notes text NOT NULL DEFAULT '',
+  updated_by uuid REFERENCES users,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  deleted_at timestamptz
+);
+CREATE TABLE resource_fields (
+  id uuid PRIMARY KEY,
+  record_id uuid NOT NULL REFERENCES resource_records,
+  label text NOT NULL,
+  position integer NOT NULL,
+  masked boolean NOT NULL DEFAULT false,
+  value_text text,
+  secret_reference text,
+  CHECK((masked AND value_text IS NULL AND secret_reference IS NOT NULL)
+     OR (NOT masked AND secret_reference IS NULL))
+);
+-- Реальные секреты — по secret_reference через корпоративное хранилище, не в value_text.
