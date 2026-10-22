@@ -5,6 +5,18 @@ import {wallPath} from './map-walls.js';
 const palette=value=>mapColors[value]||mapColors.stone;
 const short=(text,max)=>text.length>max?text.slice(0,Math.max(1,max-1))+'…':text;
 const entityLabel={floor:'плана',room:'зоны',object:'объекта',seat:'рабочего места'};
+const ISO_X=.82,ISO_Y=.46,ISO_PADDING=120;
+export function isoTransform(floor,padding=ISO_PADDING){
+  const points=[[0,0],[floor.width,0],[0,floor.height],[floor.width,floor.height]].map(([x,y])=>({x:ISO_X*(x-y),y:ISO_Y*(x+y)}));
+  const xs=points.map(point=>point.x),ys=points.map(point=>point.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  return{sx:ISO_X,sy:ISO_Y,ox:padding-minX,oy:padding-minY,width:maxX-minX+padding*2,height:maxY-minY+padding*2};
+}
+export function projectIsoPoint(iso,x,y){return{x:iso.ox+iso.sx*(x-y),y:iso.oy+iso.sy*(x+y)};}
+export function isoRectBounds(iso,x,y,width,height,padding=0){
+  const points=[[x,y],[x+width,y],[x,y+height],[x+width,y+height]].map(([px,py])=>projectIsoPoint(iso,px,py));
+  const xs=points.map(point=>point.x),ys=points.map(point=>point.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  return{x:minX-padding,y:minY-padding,w:maxX-minX+padding*2,h:maxY-minY+padding*2};
+}
 export function resizeHandles(kind,id,width,height,selected=true){
   const edges=[['n',0,0,width,0,'верхний'],['e',width,0,width,height,'правый'],['s',width,height,0,height,'нижний'],['w',0,height,0,0,'левый']];
   const corners=[['nw',0,0,'верхний левый'],['ne',width,0,'верхний правый'],['se',width,height,'нижний правый'],['sw',0,height,'нижний левый']];
@@ -13,13 +25,14 @@ export function resizeHandles(kind,id,width,height,selected=true){
 }
 export function sceneSvg(floor,map,{escape,seatSvg}){
   const e=escape;
+  const iso=isoTransform(floor);
   const roomSvg=room=>{
     const color=palette(room.color),selected=map.roomId===room.id&&!map.seatId&&!map.objectId;
     const walls=wallPath(room,floor.rooms);
     const count=floor.seats.filter(s=>s.roomId===room.id).length+(floor.objects||[]).filter(o=>o.roomId===room.id).length;
     return `<g class="office-room map-zone ${room.open?'open-zone':''} ${selected?'selected':''}" data-room-shape="${room.id}" data-map-kind="room" data-map-id="${room.id}" transform="translate(${room.x} ${room.y})" style="--zone-ink:${color.ink};--zone-fill:${color.fill};--zone-header:${color.header}"><rect class="office-room-bg" data-zone-body width="${room.width}" height="${room.height}" rx="2" data-layout="select-room" data-room="${room.id}"/><rect class="room-floor-grain" width="${room.width}" height="${room.height}" fill="url(#map-floorboards)"/><g class="room-walls" aria-hidden="true"><path class="wall-shadow" d="${walls}"/><path class="wall-body" d="${walls}"/><path class="wall-highlight" d="${walls}"/></g><g class="${room.rotation?'rotated-room-caption':''}" data-room-drag="${room.id}" data-layout="select-room" data-room="${room.id}" role="button" tabindex="0" aria-label="Зона ${e(room.name)}"><rect class="office-room-title-bg" x="8" y="8" width="${Math.max(1,room.width-16)}" height="${Math.min(49,room.height-16)}" rx="2"/><text x="19" y="30" class="office-room-name">${e(short(room.name,Math.floor((room.width-36)/11)))}</text>${room.height>=100?`<text x="19" y="48" class="office-room-type">${room.open?'Проход · ':''}${count} объектов</text>`:''}</g>${map.editing?resizeHandles('room',room.id,room.width,room.height,selected):''}${floor.seats.filter(s=>s.roomId===room.id).map(seatSvg).join('')}</g>`;
   };
-  return `<defs>${mapArtDefs}<pattern id="office-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#868b8f" fill-opacity=".2"/></pattern></defs><rect class="map-floor-fill" data-map-kind="floor" data-map-id="${floor.id}" data-layout="select-floor" data-id="${floor.id}" width="${floor.width}" height="${floor.height}" rx="3"/><rect class="map-edit-grid" width="${floor.width}" height="${floor.height}" fill="url(#office-dots)"/><rect class="map-floor-edge" data-floor-edge width="${floor.width}" height="${floor.height}" rx="3" fill="none"/><text class="map-floor-label" data-floor-label x="0" y="-23">ПЛАН · ${floor.width} × ${floor.height}</text>${map.editing?resizeHandles('floor',floor.id,floor.width,floor.height,false):''}${[...floor.rooms].sort((a,b)=>Number(b.open)-Number(a.open)).map(roomSvg).join('')}${(floor.objects||[]).map(o=>{const parent=floor.rooms.find(r=>r.id===o.roomId);return `<g class="map-equipment-layer" transform="translate(${parent?.x||0} ${parent?.y||0})">${objectSvg(o,map,e)}</g>`;}).join('')}`;
+  return `<defs>${mapArtDefs}<pattern id="office-dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#868b8f" fill-opacity=".2"/></pattern></defs><g class="iso-plan" transform="translate(${iso.ox} ${iso.oy}) matrix(${iso.sx} ${iso.sy} ${-iso.sx} ${iso.sy} 0 0)"><rect class="map-floor-fill" data-map-kind="floor" data-map-id="${floor.id}" data-layout="select-floor" data-id="${floor.id}" width="${floor.width}" height="${floor.height}" rx="3"/><rect class="map-edit-grid" width="${floor.width}" height="${floor.height}" fill="url(#office-dots)"/><rect class="map-floor-edge" data-floor-edge width="${floor.width}" height="${floor.height}" rx="3" fill="none"/><text class="map-floor-label" data-floor-label x="0" y="-23">ПЛАН · ${floor.width} × ${floor.height}</text>${map.editing?resizeHandles('floor',floor.id,floor.width,floor.height,false):''}${[...floor.rooms].sort((a,b)=>Number(b.open)-Number(a.open)).map(roomSvg).join('')}${(floor.objects||[]).map(o=>{const parent=floor.rooms.find(r=>r.id===o.roomId);return `<g class="map-equipment-layer" transform="translate(${parent?.x||0} ${parent?.y||0})">${objectSvg(o,map,e)}</g>`;}).join('')}</g>`;
 }
 function objectSvg(object,map,e){
   const {width:w,height:h}=object,size=objectSize(object),color=palette(object.color||objectKinds[object.kind]?.color),rot=object.rotation||0,selected=map.objectId===object.id;
