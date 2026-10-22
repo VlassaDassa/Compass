@@ -48,6 +48,8 @@ CREATE TABLE employees (
   email text,
   personal_phone text,
   extension text,
+  notes text NOT NULL DEFAULT '',
+  notes_updated_at timestamptz,
   credential_reference text -- ID записи в корпоративном хранилище, не сам пароль
 );
 CREATE TABLE office_floors (

@@ -22,3 +22,22 @@ export function locationForPerson(office,personId){for(const floor of office.flo
 export function assignPerson(office,seatId,personId){if(personId)for(const floor of office.floors)for(const seat of floor.seats)if(seat.personId===personId&&seat.id!==seatId)seat.personId='';const seat=office.floors.flatMap(f=>f.seats).find(s=>s.id===seatId);if(!seat)throw new Error('Рабочее место не найдено.');seat.personId=personId;}
 export function validateIp(value){return !value||/^\d{1,3}(\.\d{1,3}){3}$/.test(value)&&value.split('.').every(n=>Number(n)<=255);}
 export function resizeFloor(floor,width,height){if(!Number.isFinite(width)||!Number.isFinite(height)||width<400||height<350||width>6000||height>6000)throw new Error('Размеры плана: ширина 400–6000, высота 350–6000.');if(floor.rooms.some(r=>r.x+r.width+20>width||r.y+r.height+20>height))throw new Error('Кабинеты не помещаются в заданный размер. Увеличьте план.');floor.width=width;floor.height=height;}
+
+export function snapSeatPosition(floor,seatId,x,y,{snap=10}={}){
+  const seat=floor.seats.find(s=>s.id===seatId),room=floor.rooms.find(r=>r.id===seat?.roomId);
+  if(!seat||!room)throw new Error('Рабочее место или кабинет не найдены.');
+  if(![x,y,snap].every(Number.isFinite)||snap<=0)throw new Error('Некорректные координаты рабочего места.');
+  return{x:Math.max(20,Math.min(room.width-135,Math.round(x/snap)*snap)),y:Math.max(90,Math.min(room.height-90,Math.round(y/snap)*snap))};
+}
+export function validateSeatPosition(floor,seatId,x,y){
+  const seat=floor.seats.find(s=>s.id===seatId),room=floor.rooms.find(r=>r.id===seat?.roomId);
+  if(!seat||!room)throw new Error('Рабочее место или кабинет не найдены.');
+  if(![x,y].every(Number.isFinite)||x<20||y<90||x+120>room.width-15||y+75>room.height-15)throw new Error('Рабочее место должно оставаться внутри кабинета.');
+  if(floor.seats.some(s=>s.id!==seatId&&s.roomId===seat.roomId&&Math.abs(s.x-x)<130&&Math.abs(s.y-y)<100))throw new Error('Здесь уже находится другое рабочее место.');
+}
+export function moveSeat(floor,seatId,x,y,options){
+  const position=snapSeatPosition(floor,seatId,x,y,options);
+  validateSeatPosition(floor,seatId,position.x,position.y);
+  Object.assign(floor.seats.find(s=>s.id===seatId),position);
+  return position;
+}
