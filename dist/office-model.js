@@ -7,7 +7,7 @@ export function createOffice(people){
     const roomId=`room-${number}-open`;
     return{id:`floor-${number}`,number,name:`${number}-й этаж`,width:1000,height:680,
       rooms:[{id:roomId,name:number===3?'301 · Общий кабинет':'401 · Общий кабинет',type:'open',x:40,y:40,width:560,height:540},{id:`room-${number}-meeting`,name:'Переговорная',type:'meeting',x:640,y:40,width:320,height:240},{id:`room-${number}-print`,name:'Зона печати',type:'printing',x:640,y:320,width:320,height:260}],
-      seats:Array.from({length:6},(_,i)=>{const p=people.filter(p=>p.floor===number)[i];return{id:`seat-${number}-${i+1}`,roomId,number:p?.desk||`${number}.${String(i+1).padStart(2,'0')}`,personId:p?.id||'',pc:p?.pc||'',phone:p?.phone||'',phoneIp:p?`192.0.2.${number*10+i+1}`:'',printerName:`DEMO-PRINT-${number}01`,printerIp:`198.51.100.${number*10+1}`,printerModel:'Демо МФУ',x:45+(i%3)*165,y:110+Math.floor(i/3)*190};})};
+      seats:Array.from({length:6},(_,i)=>{const p=people.filter(p=>p.floor===number)[i];return{id:`seat-${number}-${i+1}`,roomId,number:p?.desk||`${number}.${String(i+1).padStart(2,'0')}`,personId:p?.id||'',pc:p?.pc||'',phone:p?.phone||'',phoneIp:p?`192.0.2.${number*10+i+1}`:'',printerName:`PRN-${number}01`,printerIp:`198.51.100.${number*10+1}`,printerModel:'МФУ',x:45+(i%3)*165,y:110+Math.floor(i/3)*190};})};
   })});
 }
 export function roomOverlaps(a,b,gap=16){return a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.height+gap&&a.y+a.height+gap>b.y;}

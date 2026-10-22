@@ -61,3 +61,9 @@
   .office-seat-number{font-size:14px}
   .office-room.map-zone .office-room-name{font-size:21px}
 }
+
+/* Keep the map's visual treatment in front of the base map stylesheet. */
+.office-viewport{height:600px;background:#091117;border-color:#2c444b;box-shadow:inset 0 1px #ffffff08,0 22px 55px #0007}
+.map-floor-fill{fill:#101b22}.office-room.map-zone>.office-room-bg{filter:url(#map-soft-shadow);stroke:#54706f33}.office-room.map-zone .office-room-title-bg{fill:#102329d9}.wall-shadow{stroke:#03090cbb;stroke-width:18}.wall-body{stroke:#567374;stroke-width:11}.wall-highlight{stroke:#c1e0d36b;stroke-width:1.4}.office-seat.selected .office-desk-body,.office-seat:hover .office-desk-body{fill:#3a8f7b;stroke:#a9efcf}.office-seat .office-seat-person{fill:#ecfff7;stroke:#102127}.map-object.selected .object-hit,.map-object:focus-visible .object-hit{stroke:#d9ee78}.office-zoom-controls{background:#12222bf2;border-color:#42645f;box-shadow:0 10px 30px #0008}.office-zoom-controls .icon-btn{color:#b6f0d6}.office-zoom-controls output{color:#b6d8cf}
+@media(min-width:1800px){.office-viewport{height:680px}}
+@media(max-width:760px){.office-viewport{height:430px}}

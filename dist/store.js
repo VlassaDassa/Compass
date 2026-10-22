@@ -6,7 +6,32 @@ const seed = () => ({articles:structuredClone(initialArticles),users:structuredC
 let db;
 export let state;
 export let persistent = false;
+export let serverBacked = false;
+export const storageLabel=()=>serverBacked?'PostgreSQL':'локальном хранилище браузера';
+async function serverState(){
+  const response=await fetch('/api/state',{cache:'no-store'});
+  if(response.status===404)return null;
+  if(!response.ok)throw new Error('Серверное хранилище недоступно.');
+  const payload=await response.json();return payload.state||null;
+}
+async function serverPersist(next){
+  const response=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:next})});
+  if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'Не удалось сохранить данные в PostgreSQL.');}
+}
 export async function initialize(){
+  try{
+    const remote=await serverState();
+    state=remote||seed();serverBacked=true;persistent=true;
+    const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault;
+    state.people??=enrichPeople();state.office??=createOffice(state.people);
+    upgradeOffice(state.office);
+    state.vault??=[{id:'share-folder',title:'Общая папка',notes:'Добавьте рабочие данные после настройки сервера.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'path',label:'Сетевой путь',value:'',secret:false},{id:'contact',label:'Ответственный',value:'',secret:false}]}];state.vaultTrash??=[];
+    state.demoCredentials??=Object.fromEntries(state.people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]));
+    if(!remote||needsMigration)await serverPersist(state);
+    return state;
+  }catch(error){
+    serverBacked=false;
+  }
   try{
     db=await new Promise((resolve,reject)=>{const r=indexedDB.open('compass-knowledge-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     const saved=await new Promise((resolve,reject)=>{const r=db.transaction('workspace').objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
@@ -15,13 +40,14 @@ export async function initialize(){
     const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault;
     state.people??=enrichPeople();state.office??=createOffice(state.people);
     upgradeOffice(state.office);
-    state.vault??=[{id:'demo-share',title:'Общая папка · пример',notes:'Демонстрационная запись. Замените своими несекретными тестовыми данными.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'path',label:'Сетевой путь',value:'\\\\files.example.test\\support',secret:false},{id:'contact',label:'Ответственный',value:'Демо · IT-поддержка',secret:false}]},{id:'demo-service',title:'Внутренний сервис · пример',notes:'В одной записи могут быть ссылки, логины, заметки и скрытые значения.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'url',label:'URL',value:'https://service.example.test',secret:false},{id:'login',label:'Логин',value:'support.demo',secret:false},{id:'password',label:'Пароль · демо',value:'Demo-Only-Vault!',secret:true}]}];state.vaultTrash??=[];
+    state.vault??=[{id:'share-folder',title:'Общая папка',notes:'Сетевые пути и ответственные команды.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'path',label:'Сетевой путь',value:'',secret:false},{id:'contact',label:'Ответственный',value:'',secret:false}]},{id:'internal-service',title:'Внутренний сервис',notes:'Ссылки, логины и скрытые значения в одной записи.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'url',label:'URL',value:'',secret:false},{id:'login',label:'Логин',value:'',secret:false},{id:'password',label:'Пароль',value:'',secret:true}]}];state.vaultTrash??=[];
     state.demoCredentials??=Object.fromEntries(state.people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]));
     if(!saved||needsMigration)await persist(state);
   }catch{state??=seed();persistent=false;}
   state.vault??=[];state.vaultTrash??=[];return state;
 }
 async function persist(next){
+  if(serverBacked){await serverPersist(next);return;}
   if(!db)throw new Error('Хранилище браузера недоступно. Разрешите локальное хранение данных.');
   await new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(next,'state');tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error||new Error('Не удалось сохранить.'));tx.onabort=()=>reject(tx.error||new Error('Запись отменена.'));});
 }

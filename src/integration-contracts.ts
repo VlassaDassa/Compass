@@ -1,4 +1,4 @@
-/** Contracts for a future internal backend. No network calls are made by the demo. */
+/** Contracts shared by the local server adapter and the browser client. */
 export type IntegrationState = 'not_configured' | 'connecting' | 'ready' | 'error';
 export interface IntegrationStatus { id:string; state:IntegrationState; lastSyncAt?:string; message?:string }
 export interface ContextScope { centerId?:string; departmentId?:string; asOf:string }

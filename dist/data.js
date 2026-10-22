@@ -6,7 +6,7 @@ export const categories = [
   {id:'access',name:'Доступы и безопасность',desc:'Общие папки, учётные записи и USB',icon:'shield',color:'yellow'},
   {id:'rules',name:'Регламенты и процессы',desc:'Согласования, заявки и оборудование',icon:'clipboard',color:'pink'},
 ];
-const intro = '<blockquote><p>Демонстрационная инструкция. Перед работой замените примеры утверждённым регламентом вашей организации. Названия, контакты и оборудование вымышлены.</p></blockquote>';
+const intro = '<blockquote><p>Перед работой сверяйтесь с актуальным регламентом вашей организации и полномочиями своей роли.</p></blockquote>';
 const content = (lead,steps,extra='') => `${intro}<h2>Перед началом</h2><p>${lead}</p><h2>Порядок действий</h2><ol>${steps.map(([title,body])=>`<li><p><strong>${title}</strong></p><p>${body}</p></li>`).join('')}</ol>${extra}<h2>Как понять, что всё готово</h2><p>Проверьте результат вместе с сотрудником и зафиксируйте выполненные действия в заявке. Если проверка не прошла, укажите текст ошибки и передайте заявку ответственной группе.</p>`;
 const raw = [
  ['new-workplace','Подготовка рабочего места нового сотрудника','workplace','Всё по порядку: оборудование, сеть, учётная запись и передача места.',12,'21.10.2026',true,
@@ -80,14 +80,14 @@ const raw = [
  ['Подтвердите результат','Как проверили с сотрудником. Добавьте ссылку на статью базы знаний или создайте её, если решение пригодится другим.']
  ])],
 ];
-export const initialArticles=raw.map(([id,title,category,summary,minutes,date,pinned,body],i)=>({id,title,category,summary,minutes,date,pinned,body,author:['Алексей Морозов','Мария Волкова','Дмитрий Соколов'][i%3],center:'БЦ «Горизонт»',department:'Все отделы',tags:category==='software'?['Программы','Диагностика']:category==='network'?['Сеть','Для новичков']:['Инструкция'],effective:date.split('.').reverse().join('-'),status:'published',views:0,revisions:[{version:1,date,author:'Алексей Морозов',note:'Первичная публикация демонстрационной инструкции',body,title,summary,effective:date.split('.').reverse().join('-') }]}));
+export const initialArticles=raw.map(([id,title,category,summary,minutes,date,pinned,body],i)=>({id,title,category,summary,minutes,date,pinned,body,author:['Алексей Морозов','Мария Волкова','Дмитрий Соколов'][i%3],center:'БЦ «Горизонт»',department:'Все отделы',tags:category==='software'?['Программы','Диагностика']:category==='network'?['Сеть','Для новичков']:['Инструкция'],effective:date.split('.').reverse().join('-'),status:'published',views:0,revisions:[{version:1,date,author:'Алексей Морозов',note:'Первичная публикация',body,title,summary,effective:date.split('.').reverse().join('-') }]}));
 export const people=[
- {id:'p1',name:'Анна Смирнова',job:'Главный бухгалтер',department:'Бухгалтерия',floor:3,desk:'3.01',phone:'2101',pc:'DEMO-PC-301',initials:'АС',color:'peach'},
- {id:'p2',name:'Михаил Орлов',job:'Руководитель отдела',department:'Отдел продаж',floor:3,desk:'3.02',phone:'2102',pc:'DEMO-PC-302',initials:'МО',color:'blue'},
- {id:'p3',name:'Елена Белова',job:'HR-специалист',department:'Отдел кадров',floor:3,desk:'3.03',phone:'2103',pc:'DEMO-PC-303',initials:'ЕБ',color:'purple'},
- {id:'p4',name:'Дмитрий Соколов',job:'Системный администратор',department:'IT-поддержка',floor:3,desk:'3.04',phone:'2104',pc:'DEMO-PC-304',initials:'ДС',color:'green'},
- {id:'p5',name:'Ольга Лебедева',job:'Бухгалтер',department:'Бухгалтерия',floor:4,desk:'4.01',phone:'2201',pc:'DEMO-PC-401',initials:'ОЛ',color:'pink'},
- {id:'p6',name:'Иван Петров',job:'Менеджер',department:'Отдел продаж',floor:4,desk:'4.02',phone:'2202',pc:'DEMO-PC-402',initials:'ИП',color:'yellow'},
+ {id:'p1',name:'Анна Смирнова',job:'Главный бухгалтер',department:'Бухгалтерия',floor:3,desk:'3.01',phone:'2101',pc:'PC-301',initials:'АС',color:'peach'},
+ {id:'p2',name:'Михаил Орлов',job:'Руководитель отдела',department:'Отдел продаж',floor:3,desk:'3.02',phone:'2102',pc:'PC-302',initials:'МО',color:'blue'},
+ {id:'p3',name:'Елена Белова',job:'HR-специалист',department:'Отдел кадров',floor:3,desk:'3.03',phone:'2103',pc:'PC-303',initials:'ЕБ',color:'purple'},
+ {id:'p4',name:'Дмитрий Соколов',job:'Системный администратор',department:'IT-поддержка',floor:3,desk:'3.04',phone:'2104',pc:'PC-304',initials:'ДС',color:'green'},
+ {id:'p5',name:'Ольга Лебедева',job:'Бухгалтер',department:'Бухгалтерия',floor:4,desk:'4.01',phone:'2201',pc:'PC-401',initials:'ОЛ',color:'pink'},
+ {id:'p6',name:'Иван Петров',job:'Менеджер',department:'Отдел продаж',floor:4,desk:'4.02',phone:'2202',pc:'PC-402',initials:'ИП',color:'yellow'},
 ];
 export const initialUsers=[{id:'u1',name:'Алексей Морозов',email:'alexey@example.test',role:'admin',initials:'АМ'},{id:'u2',name:'Мария Волкова',email:'maria@example.test',role:'user',initials:'МВ'},{id:'u3',name:'Дмитрий Соколов',email:'dmitry@example.test',role:'user',initials:'ДС'}];
 export const glossary=[['Active Directory','Каталог учётных записей, компьютеров и групп. Через него управляют доступами и политиками.','network-basics'],['Спуллер','Служба, которая принимает задания печати и передаёт их принтеру. Может быть локальной или общей на сервере.','printer-queue'],['VLAN и подсеть','VLAN разделяет сеть логически на канальном уровне; IP-подсеть задаёт диапазон адресов. Их соответствие определяет сетевая группа.','network-basics'],['PC-порт телефона','Порт для подключения компьютера через IP-телефон. Конкретная схема зависит от модели и настроек сети.','phone-pc']];
