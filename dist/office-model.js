@@ -1,7 +1,7 @@
 // Pure layout helpers shared by the UI and the data migration.
 export const roomTypes={office:'Кабинет',open:'Открытый офис',meeting:'Переговорная',printing:'Зона печати'};
-export const mapColors={amber:{name:'Песочный',ink:'#ffd05a',fill:'#392c17',header:'#594019'},teal:{name:'Мятный',ink:'#39e4b8',fill:'#17392f',header:'#1d5443'},violet:{name:'Сиреневый',ink:'#bc8aff',fill:'#302144',header:'#4b2f68'},coral:{name:'Терракотовый',ink:'#ff947d',fill:'#402821',header:'#633a2d'},blue:{name:'Небесный',ink:'#64beff',fill:'#1c3448',header:'#284d6a'},stone:{name:'Серый',ink:'#bdc2cd',fill:'#292b31',header:'#373a43'}};
-export const objectKinds={door:{name:'Дверь',width:80,height:80,color:'amber'},window:{name:'Окно',width:110,height:16,color:'blue'},printer:{name:'Принтер',width:76,height:70,color:'violet'},table:{name:'Стол',width:140,height:80,color:'amber'},cabinet:{name:'Шкаф',width:85,height:60,color:'stone'},plant:{name:'Растение',width:48,height:48,color:'teal'},sofa:{name:'Диван',width:130,height:65,color:'coral'},marker:{name:'Ориентир',width:75,height:54,color:'coral'}};
+export const mapColors={amber:{name:'Тёплый',ink:'#c7b58c',fill:'#343536',header:'#3e3e3b'},teal:{name:'Шалфей',ink:'#9cae9f',fill:'#333837',header:'#3d4340'},violet:{name:'Дымчатый',ink:'#aaa6b6',fill:'#36353b',header:'#403e47'},coral:{name:'Глина',ink:'#b6a69d',fill:'#393634',header:'#44403c'},blue:{name:'Стальной',ink:'#a1adb7',fill:'#33383c',header:'#3c4349'},stone:{name:'Графит',ink:'#b0b3b8',fill:'#35383b',header:'#404449'}};
+export const objectKinds={door:{name:'Дверь',width:80,height:80,color:'amber'},window:{name:'Окно',width:110,height:16,color:'blue'},printer:{name:'Принтер',width:76,height:70,color:'stone'},table:{name:'Стол',width:140,height:80,color:'amber'},cabinet:{name:'Шкаф',width:85,height:60,color:'stone'},plant:{name:'Растение',width:48,height:48,color:'teal'},sofa:{name:'Диван',width:130,height:65,color:'stone'},marker:{name:'Ориентир',width:75,height:54,color:'coral'}};
 export function createOffice(people){
   return upgradeOffice({version:1,floors:[3,4].map(number=>{
     const roomId=`room-${number}-open`;
@@ -15,12 +15,14 @@ export function validateRoom(floor,room){
   if(!room.name.trim())throw new Error('Укажите название зоны.');
   if(![room.x,room.y,room.width,room.height].every(Number.isFinite)||room.x<20||room.y<20||room.width<40||room.height<40||room.width>5000||room.height>5000||room.x+room.width>5980||room.y+room.height>5980)throw new Error('Размер зоны — от 40 до 5000. Координаты — от 20 до 5980, в пределах плана.');
   if(!room.open&&floor.rooms.some(r=>r.id!==room.id&&!r.open&&roomOverlaps(r,room,0)))throw new Error('Зона пересекается с другой. Для коридоров и соединённых проходов включите «Без стен».');
-  if(floor.seats.some(s=>s.roomId===room.id&&(s.x+120>room.width-15||s.y+75>room.height-15)))throw new Error('В новые размеры не помещаются рабочие места. Увеличьте зону.');
+  if(floor.seats.some(s=>s.roomId===room.id&&(s.x<20||s.y<90||s.x+seatSize(s).width>room.width-15||s.y+seatSize(s).height>room.height-15)))throw new Error('В новые размеры не помещаются рабочие места. Увеличьте зону.');
   if((floor.objects||[]).some(o=>o.roomId===room.id&&(o.x<0||o.y<0||o.x+objectSize(o).width>room.width||o.y+objectSize(o).height>room.height)))throw new Error('В новые размеры не помещаются объекты. Переместите их или увеличьте зону.');
 }
 export function saveRoom(floor,room){validateRoom(floor,room);const i=floor.rooms.findIndex(r=>r.id===room.id);if(i<0)floor.rooms.push(room);else floor.rooms[i]=room;floor.width=Math.max(floor.width,room.x+room.width+40);floor.height=Math.max(floor.height,room.y+room.height+40);}
 export function nextRoomPosition(floor,placement='right'){return placement==='bottom'?{x:40,y:Math.max(20,...floor.rooms.map(r=>r.y+r.height))+40}:{x:Math.max(20,...floor.rooms.map(r=>r.x+r.width))+40,y:40};}
-export function nextSeatPosition(floor,room){for(let y=90;y+75<=room.height-15;y+=145)for(let x=30;x+120<=room.width-15;x+=150)if(!floor.seats.some(s=>s.roomId===room.id&&Math.abs(s.x-x)<130&&Math.abs(s.y-y)<100))return{x,y};throw new Error('В кабинете нет свободного пространства. Сначала увеличьте его размеры.');}
+export function seatSize(seat){return{width:seat.width??120,height:seat.height??75};}
+export function seatsOverlap(a,b){const sa=seatSize(a),sb=seatSize(b);return a.x<b.x+sb.width+10&&a.x+sa.width+10>b.x&&a.y<b.y+sb.height+25&&a.y+sa.height+25>b.y;}
+export function nextSeatPosition(floor,room,size={width:120,height:75}){for(let y=90;y+size.height<=room.height-15;y+=size.height+70)for(let x=30;x+size.width<=room.width-15;x+=size.width+30)if(!floor.seats.some(s=>s.roomId===room.id&&seatsOverlap({...size,x,y},s)))return{x,y};throw new Error('В кабинете нет свободного пространства. Сначала увеличьте его размеры.');}
 export function locationForPerson(office,personId){for(const floor of office.floors){const seat=floor.seats.find(s=>s.personId===personId);if(seat)return{floor,seat,room:floor.rooms.find(r=>r.id===seat.roomId)};}return null;}
 export function assignPerson(office,seatId,personId){if(personId)for(const floor of office.floors)for(const seat of floor.seats)if(seat.personId===personId&&seat.id!==seatId)seat.personId='';const seat=office.floors.flatMap(f=>f.seats).find(s=>s.id===seatId);if(!seat)throw new Error('Рабочее место не найдено.');seat.personId=personId;}
 export function validateIp(value){return !value||/^\d{1,3}(\.\d{1,3}){3}$/.test(value)&&value.split('.').every(n=>Number(n)<=255);}
@@ -31,13 +33,14 @@ export function snapSeatPosition(floor,seatId,x,y,{snap=10}={}){
   const seat=floor.seats.find(s=>s.id===seatId),room=floor.rooms.find(r=>r.id===seat?.roomId);
   if(!seat||!room)throw new Error('Рабочее место или кабинет не найдены.');
   if(![x,y,snap].every(Number.isFinite)||snap<=0)throw new Error('Некорректные координаты рабочего места.');
-  return{x:Math.max(20,Math.min(room.width-135,Math.round(x/snap)*snap)),y:Math.max(90,Math.min(room.height-90,Math.round(y/snap)*snap))};
+  return{x:Math.max(20,Math.min(room.width-seatSize(seat).width-15,Math.round(x/snap)*snap)),y:Math.max(90,Math.min(room.height-seatSize(seat).height-15,Math.round(y/snap)*snap))};
 }
 export function validateSeatPosition(floor,seatId,x,y){
   const seat=floor.seats.find(s=>s.id===seatId),room=floor.rooms.find(r=>r.id===seat?.roomId);
   if(!seat||!room)throw new Error('Рабочее место или кабинет не найдены.');
-  if(![x,y].every(Number.isFinite)||x<20||y<90||x+120>room.width-15||y+75>room.height-15)throw new Error('Рабочее место должно оставаться внутри кабинета.');
-  if(floor.seats.some(s=>s.id!==seatId&&s.roomId===seat.roomId&&Math.abs(s.x-x)<130&&Math.abs(s.y-y)<100))throw new Error('Здесь уже находится другое рабочее место.');
+  const size=seatSize(seat);if(![size.width,size.height].every(Number.isFinite)||size.width<60||size.height<45||size.width>600||size.height>600)throw new Error('Размер рабочего места: ширина 60–600, высота 45–600.');
+  if(![x,y].every(Number.isFinite)||x<20||y<90||x+seatSize(seat).width>room.width-15||y+seatSize(seat).height>room.height-15)throw new Error('Рабочее место должно оставаться внутри кабинета.');
+  if(floor.seats.some(s=>s.id!==seatId&&s.roomId===seat.roomId&&seatsOverlap({...seat,x,y},s)))throw new Error('Здесь уже находится другое рабочее место.');
 }
 export function moveSeat(floor,seatId,x,y,options){
   const position=snapSeatPosition(floor,seatId,x,y,options);
@@ -92,7 +95,7 @@ export function nextObjectPosition(floor,roomId,kind){
   const items=(floor.objects||[]).filter(o=>(o.roomId||'')===(roomId||''));
   for(let y=roomId?70:40;y+definition.height<=parent.height-padding;y+=100)for(let x=roomId?25:40;x+definition.width<=parent.width-padding;x+=100){
     const candidate={x,y,width:definition.width,height:definition.height};
-    if(!items.some(o=>roomOverlaps(candidate,{...o,...objectSize(o)},12))&&!floor.seats.some(s=>s.roomId===roomId&&roomOverlaps(candidate,{x:s.x,y:s.y-25,width:120,height:100},8)))return{x,y};
+    if(!items.some(o=>roomOverlaps(candidate,{...o,...objectSize(o)},12))&&!floor.seats.some(s=>s.roomId===roomId&&roomOverlaps(candidate,{x:s.x,y:s.y-25,width:seatSize(s).width,height:seatSize(s).height+25},8)))return{x,y};
   }
   return{x:padding,y:padding};
 }

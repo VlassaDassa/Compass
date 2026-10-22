@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "node server.mjs",
     "build": "node build.mjs",
-    "test": "node --test tests/office-model.test.mjs tests/map-gestures.test.mjs tests/layout-editor.test.mjs tests/people-vault.test.mjs",
-    "check": "node --check dist/app.js && node --check dist/data.js && node --check dist/store.js && node --check dist/office.js && node --check dist/office-model.js && node --check dist/map-gestures.js && node --check dist/map-scene.js && node --check dist/layout-editor.js && node --check dist/people-model.js && node --check dist/copy-utils.js && node --check dist/vault.js && node --check dist/vault-model.js"
+    "test": "node --test tests/office-model.test.mjs tests/map-gestures.test.mjs tests/layout-editor.test.mjs tests/people-vault.test.mjs tests/map-resize.test.mjs",
+    "check": "node --check dist/app.js && node --check dist/data.js && node --check dist/store.js && node --check dist/office.js && node --check dist/office-model.js && node --check dist/map-gestures.js && node --check dist/map-scene.js && node --check dist/layout-editor.js && node --check dist/people-model.js && node --check dist/copy-utils.js && node --check dist/vault.js && node --check dist/vault-model.js && node --check dist/map-art.js && node --check dist/map-resize.js"
   },
   "dependencies": {
     "@fontsource-variable/golos-text": "^5.3.0",

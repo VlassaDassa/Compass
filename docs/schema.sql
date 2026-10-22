@@ -59,8 +59,8 @@ CREATE TABLE office_floors (
   center_id uuid NOT NULL REFERENCES centers,
   floor_number integer NOT NULL,
   name text NOT NULL,
-  width integer NOT NULL CHECK(width BETWEEN 400 AND 6000),
-  height integer NOT NULL CHECK(height BETWEEN 350 AND 6000),
+  width numeric(10,2) NOT NULL CHECK(width BETWEEN 400 AND 6000),
+  height numeric(10,2) NOT NULL CHECK(height BETWEEN 350 AND 6000),
   version integer NOT NULL DEFAULT 1,
   UNIQUE(center_id,floor_number)
 );
@@ -70,8 +70,8 @@ CREATE TABLE office_rooms (
   name text NOT NULL,
   color text NOT NULL DEFAULT 'teal',
   open_area boolean NOT NULL DEFAULT false,
-  x integer NOT NULL CHECK(x >= 20), y integer NOT NULL CHECK(y >= 20),
-  width integer NOT NULL CHECK(width BETWEEN 40 AND 5000), height integer NOT NULL CHECK(height BETWEEN 40 AND 5000),
+  x numeric(10,2) NOT NULL CHECK(x >= 20), y numeric(10,2) NOT NULL CHECK(y >= 20),
+  width numeric(10,2) NOT NULL CHECK(width BETWEEN 40 AND 5000), height numeric(10,2) NOT NULL CHECK(height BETWEEN 40 AND 5000),
   UNIQUE(id,floor_id)
 );
 CREATE TABLE office_workplaces (
@@ -86,7 +86,9 @@ CREATE TABLE office_workplaces (
   printer_name text,
   printer_ip inet,
   printer_model text,
-  x integer NOT NULL, y integer NOT NULL,
+  width numeric(10,2) NOT NULL DEFAULT 120 CHECK(width BETWEEN 60 AND 600),
+  height numeric(10,2) NOT NULL DEFAULT 75 CHECK(height BETWEEN 45 AND 600),
+  x numeric(10,2) NOT NULL, y numeric(10,2) NOT NULL,
   FOREIGN KEY(room_id,floor_id) REFERENCES office_rooms(id,floor_id),
   UNIQUE(floor_id,seat_number)
 );
@@ -98,9 +100,9 @@ CREATE TABLE office_objects (
   name text NOT NULL,
   kind text NOT NULL,
   color text NOT NULL,
-  x integer NOT NULL, y integer NOT NULL,
-  width integer NOT NULL CHECK(width BETWEEN 12 AND 1500),
-  height integer NOT NULL CHECK(height BETWEEN 12 AND 1500),
+  x numeric(10,2) NOT NULL, y numeric(10,2) NOT NULL,
+  width numeric(10,2) NOT NULL CHECK(width BETWEEN 12 AND 1500),
+  height numeric(10,2) NOT NULL CHECK(height BETWEEN 12 AND 1500),
   rotation integer NOT NULL DEFAULT 0 CHECK(rotation IN (0,90,180,270)),
   notes text NOT NULL DEFAULT '',
   ip inet,
