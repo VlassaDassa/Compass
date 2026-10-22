@@ -2,14 +2,14 @@ import {objectKinds} from './office-model.js';
 
 // Top-down SVG furniture: shared materials keep the plan quiet and consistent.
 export const mapArtDefs=`
-<linearGradient id="map-wood" x2="0.15" y2="1"><stop stop-color="#b8a384"/><stop offset=".55" stop-color="#a58e70"/><stop offset="1" stop-color="#89745c"/></linearGradient>
-<linearGradient id="map-metal" x2="0" y2="1"><stop stop-color="#747b81"/><stop offset="1" stop-color="#373e45"/></linearGradient>
-<linearGradient id="map-case" x2=".2" y2="1"><stop stop-color="#d1d3cf"/><stop offset="1" stop-color="#8e9698"/></linearGradient>
-<linearGradient id="map-fabric" x2=".25" y2="1"><stop stop-color="#6d7579"/><stop offset="1" stop-color="#454c53"/></linearGradient>
-<linearGradient id="map-screen" x2=".7" y2="1"><stop stop-color="#748994"/><stop offset=".45" stop-color="#455b67"/><stop offset="1" stop-color="#283d49"/></linearGradient>
-<linearGradient id="map-glass" x2="0" y2="1"><stop stop-color="#c2d2d5"/><stop offset=".5" stop-color="#829da7"/><stop offset="1" stop-color="#536c76"/></linearGradient>
-<pattern id="map-floorboards" width="160" height="64" patternUnits="userSpaceOnUse"><rect width="160" height="64" fill="#34383b"/><path d="M0 0H160M0 32H160M80 0V32M20 32V64" stroke="#c7c4ba" stroke-opacity=".055"/><path d="M0 2H160M0 34H160" stroke="#000" stroke-opacity=".09"/></pattern>
-<filter id="map-soft-shadow" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="0" dy="3" stdDeviation="2.3" flood-color="#070a0d" flood-opacity=".5"/></filter>
+<linearGradient id="map-wood" x2="0.15" y2="1"><stop stop-color="#e0bd91"/><stop offset=".55" stop-color="#c99a6d"/><stop offset="1" stop-color="#a97852"/></linearGradient>
+<linearGradient id="map-metal" x2="0" y2="1"><stop stop-color="#e5ecee"/><stop offset="1" stop-color="#aab9bf"/></linearGradient>
+<linearGradient id="map-case" x2=".2" y2="1"><stop stop-color="#fbfcfa"/><stop offset="1" stop-color="#c5d0d2"/></linearGradient>
+<linearGradient id="map-fabric" x2=".25" y2="1"><stop stop-color="#73a6b2"/><stop offset="1" stop-color="#3e6876"/></linearGradient>
+<linearGradient id="map-screen" x2=".7" y2="1"><stop stop-color="#b8e5e7"/><stop offset=".45" stop-color="#5f9da8"/><stop offset="1" stop-color="#2e6675"/></linearGradient>
+<linearGradient id="map-glass" x2="0" y2="1"><stop stop-color="#e6f6f5"/><stop offset=".5" stop-color="#8fcbd0"/><stop offset="1" stop-color="#4c8b99"/></linearGradient>
+<pattern id="map-floorboards" width="160" height="64" patternUnits="userSpaceOnUse"><rect width="160" height="64" fill="#eadfce"/><path d="M0 0H160M0 32H160M80 0V32M20 32V64" stroke="#9e896e" stroke-opacity=".12"/><path d="M0 2H160M0 34H160" stroke="#ffffff" stroke-opacity=".6"/></pattern>
+<filter id="map-soft-shadow" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#34505b" flood-opacity=".24"/></filter>
 `;
 
 export function furnitureArt(kind,width,height){
