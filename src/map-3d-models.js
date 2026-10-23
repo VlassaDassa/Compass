@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {wallSegments} from '../dist/map-walls.js';
 
 const colors={wood:0xb98c63,woodEdge:0x805f4a,metal:0x8693aa,dark:0x242737,screen:0x72c8de,ivory:0xd0d4de,fabric:0x6674a4,leaf:0x648f77,pot:0x9c7063,gold:0xbca2ed,glass:0x7aa4ca};
 const materials=Object.fromEntries(Object.entries(colors).map(([key,color])=>[key,new T.MeshStandardMaterial({color,roughness:key==='metal'?.48:.76,metalness:key==='metal'?.28:0,emissive:key==='screen'?0x265267:0,emissiveIntensity:.35})]));
@@ -94,4 +95,17 @@ export function createPlatform(width,height,depth,topColor,sideColor){
   mesh.position.set(width/2,height/2,-depth/2);mesh.receiveShadow=true;mesh.castShadow=true;
   const group=new T.Group();group.add(mesh);
   const border=new T.LineSegments(new T.EdgesGeometry(geometry),new T.LineBasicMaterial({color:0x81729e,transparent:true,opacity:.38}));border.position.copy(mesh.position);group.add(border);return group;
+}
+
+export function createZoneWalls(room,rooms){
+  const group=new T.Group();if(room.open)return group;
+  const thickness=4,segments=wallSegments(room,rooms),material=new T.MeshStandardMaterial({color:0x746b86,roughness:.82});
+  for(const [side,parts]of Object.entries(segments))for(const [a,b]of parts){
+    // The front boundary stays low so it never hides desks or chairs.
+    const horizontal=side==='n'||side==='s',height=side==='n'||side==='w'?24:13;
+    const mesh=new T.Mesh(new T.BoxGeometry(horizontal?b-a:thickness,horizontal?thickness:b-a,height),material);
+    mesh.position.set(horizontal?(a+b)/2:side==='w'?thickness/2:room.width-thickness/2,horizontal?(side==='n'?thickness/2:room.height-thickness/2):(a+b)/2,height/2);
+    mesh.castShadow=true;mesh.receiveShadow=true;mesh.name='zone-wall';group.add(mesh);
+  }
+  return group;
 }

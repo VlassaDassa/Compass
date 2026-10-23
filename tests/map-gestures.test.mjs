@@ -66,6 +66,15 @@ test('successive pan moves do not feed the moved camera back into the delta',()=
   for(const x of [110,120,130]){handlers.pointermove({pointerId:1,clientX:x,clientY:100,target});assert.equal(map.camera.x,-(x-100)*2);}
 });
 
+for(const editing of [false,true])test(`a captured pointer click selects a visible 3D model without Space in ${editing?'edit':'normal'} mode`,async()=>{
+  const floor=createOffice([]).floors[0],handlers={},selected=[],root={closest:()=>null,setPointerCapture(){},hasPointerCapture:()=>true,releasePointerCapture(){}},element={...root,classList:{toggle(){}}};
+  const svg={...root,style:{},addEventListener:(name,fn)=>handlers[name]=fn,querySelectorAll:()=>[element]};
+  const map={editing,camera:{x:0,y:0,w:1000,h:680},gestures:new Map()};
+  attachCanvasGestures({svg,map,getFloor:()=>floor,toWorld:(x,y)=>({x,y,scale:1}),pick:()=>({kind:'object',id:floor.objects[0].id}),activate:(kind,id)=>selected.push({kind,id}),select(){},render(){},report(){},isActive:()=>true});
+  const event={button:0,pointerId:1,clientX:200,clientY:100,target:root};handlers.pointerdown(event);await handlers.pointerup({...event,type:'pointerup'});
+  assert.deepEqual(selected,[{kind:'object',id:floor.objects[0].id}]);let prevented=false;handlers.click({preventDefault(){prevented=true;},stopPropagation(){}});assert.ok(prevented);assert.equal(selected.length,1);
+});
+
 function resizing({kind='object',axis='e'}={}){
   const floor=createOffice([]).floors[0],object=floor.objects[0],handlers={},saved=[],previews=[],messages=[];
   const id=kind==='floor'?floor.id:object.id;

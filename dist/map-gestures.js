@@ -2,9 +2,15 @@ import {snapSeatPosition,validateSeatPosition,snapObjectPosition,validateObject,
 import {resizeLayout,validateLayoutResize} from './map-resize.js';
 
 /** SVG coordinates stay independent of screen size and the current zoom. */
-export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,previewEntity,select,render,report,isActive}){
+export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,previewEntity,pick,activate,select,render,report,isActive}){
   let drag=null,pinch=null;
   const screenPoint=point=>point.view||point;
+  const targetAt=event=>{
+    const caption=event.target.closest('[data-map-caption]'),grip=event.target.closest('[data-map-move]');
+    const element=(caption||grip||!pick)?event.target.closest('[data-map-kind]'):null;
+    if(element)return{kind:element.dataset.mapKind,id:element.dataset.mapId};
+    return pick?.(event.clientX,event.clientY)||null;
+  };
   const preview=()=>{
     if(drag?.seat){
       const el=svg.querySelector(`[data-seat="${drag.seat.id}"]`);
@@ -39,15 +45,16 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     const point=toWorld(event.clientX,event.clientY),floor=getFloor();
     const editable=map.editing&&!map.spacePanning&&map.gestures.size===1;
     const handle=editable?event.target.closest('[data-resize-kind]'):null;
-    const seatId=editable&&!handle?event.target.closest('.office-seat')?.dataset.seat:null;
-    const objectId=editable&&!handle&&!seatId?event.target.closest('[data-object]')?.dataset.object:null;
+    const hit=targetAt(event);
+    const seatId=editable&&!handle?(pick?(hit?.kind==='seat'?hit.id:null):event.target.closest('.office-seat')?.dataset.seat):null;
+    const objectId=editable&&!handle&&!seatId?(pick?(hit?.kind==='object'?hit.id:null):event.target.closest('[data-object]')?.dataset.object):null;
     const zone=editable&&!handle&&!seatId&&!objectId?event.target.closest('[data-room-shape]'):null;
-    const roomId=zone?.dataset.roomShape||(!handle&&!objectId&&editable&&!seatId?event.target.closest('[data-room-drag]')?.dataset.roomDrag:null);
+    const roomId=pick?(editable&&!handle&&hit?.kind==='room'?hit.id:null):zone?.dataset.roomShape||(!handle&&!objectId&&editable&&!seatId?event.target.closest('[data-room-drag]')?.dataset.roomDrag:null);
     const resizeKind=handle?.dataset.resizeKind;
     const collection=resizeKind==='room'?floor.rooms:resizeKind==='seat'?floor.seats:floor.objects;
     const sized=handle&&resizeKind!=='floor'?collection?.find(r=>r.id===handle.dataset.resizeId):null;
     const resizeItem=resizeKind==='floor'?floor:sized;
-    drag={start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,floor:handle?structuredClone(floor):null,resize:handle&&resizeItem?{kind:resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis}:null};
+    drag={target:hit,start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,floor:handle?structuredClone(floor):null,resize:handle&&resizeItem?{kind:resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis}:null};
     if(handle&&resizeKind!=='floor')select?.(resizeKind,resizeItem.id);
     else if(seatId)select?.('seat',seatId);
     else if(objectId)select?.('object',objectId);
@@ -58,7 +65,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     }
   });
   svg.addEventListener('pointermove',event=>{
-    if(!map.gestures.has(event.pointerId))return;
+    if(!map.gestures.has(event.pointerId)){if(pick&&map.editing&&!map.spacePanning){const hit=targetAt(event);svg.style.cursor=hit&&['seat','object'].includes(hit.kind)?'grab':'';}return;}
     map.gestures.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(map.gestures.size===2&&pinch){
       const [a,b]=[...map.gestures.values()],distance=Math.hypot(a.x-b.x,a.y-b.y);
@@ -121,7 +128,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     drag=null;map.dragging=false;
     svg.classList?.remove('map-resize-invalid');
     if(event.type==='pointercancel'){if(isActive())render();return;}
-    if(!moved||!finished)return;
+    if(!moved||!finished){if(finished?.target&&!finished.resize)activate?.(finished.target.kind,finished.target.id);return;}
     try{
       if(finished.error)throw new Error(finished.error);
       if(finished.nextResize){
@@ -140,7 +147,9 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
   };
   svg.addEventListener('pointerup',finish);
   svg.addEventListener('pointercancel',finish);
-  svg.addEventListener('click',event=>{if(map.moved){event.preventDefault();event.stopPropagation();map.moved=false;}},true);
+  // A pointer captured by the SVG produces a click on the SVG itself. Selection
+  // is therefore resolved explicitly at pointerup, using the original 3D hit.
+  svg.addEventListener('click',event=>{if(activate||pick||map.moved){event.preventDefault();event.stopPropagation();map.moved=false;}},true);
   svg.addEventListener('wheel',event=>{
     if(event.ctrlKey||event.metaKey){event.preventDefault();if(!map.gestures.size)zoom(event.deltaY>0?1.12:.89,screenPoint(toWorld(event.clientX,event.clientY)));}
   },{passive:false});
