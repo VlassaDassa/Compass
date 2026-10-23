@@ -1,3 +1,6 @@
+import {applyAppearance,appearanceForm,defaultAppearance,installSmoothScroll} from './appearance.js';
+import {installCustomSelects,refreshCustomSelects,closeCustomSelect} from './custom-select.js';
+import {exportWorkspace,importWorkspace} from './store.js';
 import {categories,glossary} from './data.js';
 import {installCopying} from './copy-utils.js';
 import {mountVault,disposeVault,resolveVaultValue} from './vault.js';
@@ -110,8 +113,20 @@ function renderSettings(){const tab=params.get('tab')||'general';
  else target.innerHTML=`<section class="panel"><h2>Рабочее пространство</h2><p>Компас · БЦ «Горизонт»</p><div class="settings-rows"><div class="setting-row"><div><h3>Хранение данных</h3><p>Статьи, черновики, картинки, сотрудники, карта и настройки сохраняются в ${storageLabel()}.</p></div><span class="badge ${persistent?'':'amber'}">${persistent?(serverBacked?'PostgreSQL':'Локальное'):'Недоступно'}</span></div><div class="setting-row"><div><h3>Синхронизация</h3><p>${serverBacked?'Данные доступны этому серверу и могут использоваться несколькими клиентами.':'Для общей работы запустите PostgreSQL и задайте COMPASS_DATABASE_URL.'}</p></div><span class="badge ${serverBacked?'':'amber'}">${serverBacked?'Подключена':'Ожидает настройки'}</span></div><div class="setting-row"><div><h3>Резервная копия</h3><p>Экспортируйте статьи, версии, черновики, ссылки и настройки в JSON.</p></div><button class="btn btn-small" data-action="export">${icon('download')}Экспорт</button></div></div></section><section class="panel"><h2>Читаемо на любом экране</h2><p>Интерфейс адаптируется к телефону, планшету и компьютеру. Размер текста и элементов увеличен для больших мониторов.</p><a href="#/start" class="text-link">Открыть маршрут новичка ${icon('arrow')}</a></section>`;
  target.querySelectorAll('[data-role-user]').forEach(el=>el.addEventListener('change',()=>safely(async()=>{await update(s=>{s.users.find(u=>u.id===el.dataset.roleUser).role=el.value;});toast('Роль обновлена');})));
  if(tab==='ai')loadAiSettings();
+ if(tab==='general'){
+   target.insertAdjacentHTML('beforeend',appearanceForm(state.settings?.appearance));
+   const form=$('#appearance-form');
+   const read=()=>({hue:$('#appearance-hue').value,accent:$('#appearance-accent').value,motion:$('#appearance-motion').checked,smooth:$('#appearance-smooth').checked});
+   form.addEventListener('input',()=>applyAppearance(read()));
+   form.addEventListener('submit',event=>{event.preventDefault();safely(async()=>{const value=applyAppearance(read());await update(s=>{s.settings??={};s.settings.appearance=value;});toast('Оформление сохранено');});});
+   $('#appearance-reset').addEventListener('click',()=>safely(async()=>{await update(s=>{s.settings??={};s.settings.appearance=defaultAppearance;});applyAppearance(defaultAppearance);renderSettings();toast('Фиолетовая тема восстановлена');}));
+   target.insertAdjacentHTML('beforeend','<section class="panel"><h2>Перенос рабочего пространства</h2><p>Файл переноса содержит все данные, включая секреты. Храните его в безопасном месте и удалите после импорта на VPS.</p><div class="flex gap12"><button class="btn" id="workspace-export">Скачать файл переноса</button><label class="btn" for="workspace-import">Импортировать файл</label><input class="hidden" id="workspace-import" type="file" accept=".json,.compass"></div></section>');
+   $('#workspace-export').addEventListener('click',exportWorkspace);
+   $('#workspace-import').addEventListener('change',event=>safely(async()=>{const file=event.target.files[0];if(!file)return;if(file.size>20*1024*1024)throw new Error('Размер файла — до 20 МБ.');const payload=JSON.parse(await file.text());showModal('Импорт рабочего пространства','<p>Импорт заменит текущие данные рабочего пространства данными из выбранного файла. Сначала скачайте резервную копию.</p><div class="modal-footer"><button class="btn" data-action="close-modal">Отмена</button><button class="btn btn-primary" id="confirm-workspace-import">Импортировать</button></div>');$('#confirm-workspace-import').addEventListener('click',()=>safely(async()=>{await importWorkspace(payload);closeModal();applyAppearance(state.settings?.appearance);await route();toast('Рабочее пространство перенесено');}));}));
+ }
+
 }
-async function loadAiSettings(){const form=$('#ai-settings-form');if(!form)return;try{const response=await fetch('/api/ai/settings',{cache:'no-store'});if(!response.ok)return;const data=await response.json();$('#ai-provider').value=data.provider||'gigachat';$('#ai-model').value=data.model||'';$('#ai-base-url').value=data.baseUrl||'';$('#ai-settings-status').textContent=data.configured?'Ключ сохранён на сервере. Для замены введите новый.':'Ключ ещё не задан.';}catch{}}
+async function loadAiSettings(){const form=$('#ai-settings-form');if(!form)return;try{const response=await fetch('/api/ai/settings',{cache:'no-store'});if(!response.ok)return;const data=await response.json();$('#ai-provider').value=data.provider||'gigachat';$('#ai-model').value=data.model||'';$('#ai-base-url').value=data.baseUrl||'';refreshCustomSelects();$('#ai-settings-status').textContent=data.configured?'Ключ сохранён на сервере. Для замены введите новый.':'Ключ ещё не задан.';}catch{}}
 
 async function renderEditor(){
  const a=currentArticleId?article(currentArticleId):null;
@@ -148,7 +163,7 @@ async function publish(skipSimilar=false){
 }
 
 function showModal(title,body,wide=false,onClose){
- if($('#overlay-root').children.length)closeModal(true);modalReturnFocus=document.activeElement;modalCloseCallback=onClose;
+ closeCustomSelect();if($('#overlay-root').children.length)closeModal(true);modalReturnFocus=document.activeElement;modalCloseCallback=onClose;
  $('#overlay-root').innerHTML=`<div class="overlay"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal-header"><h2 id="modal-title">${title}</h2><button class="icon-btn" data-action="close-modal" aria-label="Закрыть окно">${icon('close')}</button></header><div class="modal-body">${body}</div></section></div>`;syncScrollLock();setTimeout(()=>{($('.modal input:not([type=hidden])')||$('.modal textarea')||$('.modal button')||$('.modal a'))?.focus({preventScroll:true});},20);
  $('.overlay').addEventListener('mousedown',e=>{if(e.target===$('.overlay'))closeModal();});
 }
@@ -162,7 +177,7 @@ function syncScrollLock(){
  else if(!locked&&lockedScroll){const position=lockedScroll;lockedScroll=null;document.documentElement.classList.remove('scroll-locked');document.body.classList.remove('scroll-locked');document.body.style.top='';document.body.style.left='';restoreStickyPanels();window.scrollTo({top:position.y,left:position.x,behavior:'instant'});}
 }
 window.addEventListener('resize',()=>{if(lockedScroll)updateLockedHeader();});
-function closeModal(keepScrollLock=false){if(!$('#overlay-root').children.length)return;hideOfficeSecrets();$('#overlay-root').innerHTML='';if(!keepScrollLock)syncScrollLock();const callback=modalCloseCallback;modalCloseCallback=null;callback?.();if(modalReturnFocus?.isConnected)modalReturnFocus.focus({preventScroll:true});}
+function closeModal(keepScrollLock=false){closeCustomSelect();if(!$('#overlay-root').children.length)return;hideOfficeSecrets();$('#overlay-root').innerHTML='';if(!keepScrollLock)syncScrollLock();const callback=modalCloseCallback;modalCloseCallback=null;callback?.();if(modalReturnFocus?.isConnected)modalReturnFocus.focus({preventScroll:true});}
 function openSearch(){showModal('Поиск','');const modal=$('.modal');modal.classList.add('search-modal');modal.innerHTML=`<div class="global-search-field">${icon('search')}<input type="search" id="global-search" placeholder="Что нужно найти?" aria-label="Быстрый поиск"><kbd>ESC</kbd><button class="icon-btn" data-action="close-modal" aria-label="Закрыть поиск">${icon('close')}</button></div><div id="global-results" class="search-results"></div><div class="search-footer"><span>Ищем в заголовках, тексте и метках</span><span>${published().length} статей в базе</span></div>`;modal.removeAttribute('aria-labelledby');modal.setAttribute('aria-label','Поиск по базе знаний');const results=q=>{$('#global-results').innerHTML=(q?searchArticles(q):sortedArticles()).slice(0,7).map(a=>`<a class="search-result" href="#/article/${a.id}">${categoryIcon(a.category)}<div><h3>${esc(a.title)}</h3><p>${esc(a.summary)}</p></div>${icon('chevron')}</a>`).join('')||emptyState('Ничего не нашлось','Попробуйте другие слова.','search');};results('');$('#global-search').addEventListener('input',e=>results(e.target.value));setTimeout(()=>$('#global-search')?.focus(),30);}
 function showHistory(id){const a=article(id);if(!a)return;showModal('История изменений',`<p>${esc(a.title)} · ${a.revisions.length} ${a.revisions.length===1?'версия':'версии'}</p>${[...a.revisions].reverse().map((r,i)=>`<section class="revision"><div class="between"><h3>Версия ${r.version}</h3>${i===0?'<span class="badge">Текущая</span>':''}</div><p>${esc(r.note)}</p><time>${r.date} · ${esc(r.author)} · действует с ${formatDate(r.effective)}</time><div class="flex gap8"><button class="btn btn-small" data-action="view-version" data-id="${id}" data-version="${r.version}">${icon('eye')}Посмотреть</button>${i>0?`<button class="btn btn-small" data-action="restore-version" data-id="${id}" data-version="${r.version}">${icon('history')}Восстановить</button>`:''}</div></section>`).join('')}`);}
 function showIntegration(id){const r=integrations[id];if(!r)return;showModal(r.name,`<div class="notice">${icon('link')}Интеграция ещё не подключена</div><p>${r.detail}</p><div class="modal-footer"><button class="btn" data-action="close-modal">Понятно</button><a class="btn btn-primary" href="#/settings?tab=integrations">Настройки ${icon('arrow')}</a></div>`);}
@@ -240,7 +255,7 @@ async function route(){
  if(editorInstance){await saveDraft();editorInstance.destroy();editorInstance=null;}
  closeModal();closeMenu();disposeOffice();disposeVault();
  const [path,query]=location.hash.replace(/^#\/?/,'').split('?');const parts=path.split('/');page=parts[0]||'';currentArticleId=parts[1]||null;params=new URLSearchParams(query||'');
- shell();window.scrollTo(0,0);
+ applyAppearance(state.settings?.appearance);shell();window.scrollTo(0,0);
  switch(page){case '':renderHome();break;case 'knowledge':case 'favorites':renderLibrary();break;case 'article':renderArticle();break;case 'editor':await renderEditor();break;case 'people':renderPeople();break;case 'map':renderMap();break;case 'vault':mountVault({titleRow,footer,esc,icon,showModal,closeModal,toast});break;case 'resources':renderResources();break;case 'glossary':renderGlossary();break;case 'assistant':renderAssistant();break;case 'settings':renderSettings();break;case 'start':renderStart();break;default:$('#main-content').innerHTML=emptyState('Такой страницы пока нет','Перейдите в базу знаний или вернитесь на главную.','compass','На главную','#/');}
  if(ticket!==routeTicket)return;
  document.title=`${page==='article'&&article(currentArticleId)?article(currentArticleId).title+' — ':''}Компас · база знаний IT-поддержки`;
@@ -248,7 +263,8 @@ async function route(){
 window.addEventListener('hashchange',()=>safely(route));
 window.addEventListener('pagehide',()=>{if(editorInstance){clearTimeout(draftTimer);saveDraft().catch(()=>{});}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&editorInstance)safely(saveDraft);});
-await initialize();
+try{await initialize();}catch(error){document.body.innerHTML='<main class="content"><section class="panel"><h1>Хранилище недоступно</h1><p>Не удалось подключиться к PostgreSQL. Проверьте сервер и перезагрузите страницу.</p><button class="btn" onclick="location.reload()">Повторить</button></section></main>';throw error;}
+applyAppearance(state.settings?.appearance);installSmoothScroll();installCustomSelects();
 installCopying({toast,resolveSecret:id=>state.demoCredentials[id],resolveVault:resolveVaultValue});
 await safely(route);
 if(!persistent)toast('Хранилище браузера недоступно. Изменения пока нельзя сохранить.');

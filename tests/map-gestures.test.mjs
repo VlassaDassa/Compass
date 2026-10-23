@@ -58,6 +58,13 @@ test('the hand tool pans without moving a workplace',async()=>{
   await c.event('pointerup',110,125);
   assert.equal(c.saved.length,0);assert.deepEqual(c.map.camera,{x:-20,y:-50,w:1000,h:680});
 });
+test('successive pan moves do not feed the moved camera back into the delta',()=>{
+  const handlers={},map={editing:false,camera:{x:0,y:0,w:1000,h:680},gestures:new Map()},target={closest:()=>null,setPointerCapture(){}};
+  const svg={addEventListener:(name,fn)=>handlers[name]=fn,querySelectorAll:()=>[]};
+  attachCanvasGestures({svg,map,getFloor:()=>createOffice([]).floors[0],toWorld:(x,y)=>({x:x*2+map.camera.x,y:y*2+map.camera.y,view:{x:x*2+map.camera.x,y:y*2+map.camera.y},scale:2}),applyCamera(){},select(){},report(){},render(){},isActive:()=>true});
+  handlers.pointerdown({button:0,pointerId:1,clientX:100,clientY:100,target});
+  for(const x of [110,120,130]){handlers.pointermove({pointerId:1,clientX:x,clientY:100,target});assert.equal(map.camera.x,-(x-100)*2);}
+});
 
 function resizing({kind='object',axis='e'}={}){
   const floor=createOffice([]).floors[0],object=floor.objects[0],handlers={},saved=[],previews=[],messages=[];

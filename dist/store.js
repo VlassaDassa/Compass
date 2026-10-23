@@ -1,9 +1,11 @@
 import { initialArticles, initialUsers,people } from './data.js';
 import {createOffice,upgradeOffice} from './office-model.js';
 import {redactVault} from './vault-model.js';
+import {ensureBuildings} from './workspace-model.js';
 const enrichPeople=()=>people.map((p,i)=>({...p,email:`employee${i+1}@example.test`,personalPhone:`+7 (000) 000-00-${String(i+1).padStart(2,'0')}`}));
 const seed = () => ({articles:structuredClone(initialArticles),users:structuredClone(initialUsers),favorites:['new-workplace','shared-folder'],drafts:{},links:[],settings:{provider:'external',center:'БЦ «Горизонт»'},people:enrichPeople(),office:createOffice(people),demoCredentials:Object.fromEntries(people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]))});
 let db;
+let revision=0;
 export let state;
 export let persistent = false;
 export let serverBacked = false;
@@ -12,24 +14,28 @@ async function serverState(){
   const response=await fetch('/api/state',{cache:'no-store'});
   if(response.status===404)return null;
   if(!response.ok)throw new Error('Серверное хранилище недоступно.');
-  const payload=await response.json();return payload.state||null;
+  const payload=await response.json();revision=payload.revision||0;return payload.state||null;
 }
 async function serverPersist(next){
-  const response=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:next})});
-  if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'Не удалось сохранить данные в PostgreSQL.');}
+  const response=await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:next,revision})});
+  const payload=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(payload.error||'Не удалось сохранить данные в PostgreSQL.');error.conflict=response.status===409;throw error;}revision=payload.revision;
 }
 export async function initialize(){
+  let backendRequired=false;
+  try{const response=await fetch('/api/status',{cache:'no-store'});if(response.ok&&response.headers.get('content-type')?.includes('application/json')){const status=await response.json();backendRequired=status.runtime==='server';if(backendRequired&&!status.persistence)throw new Error('PostgreSQL недоступен.');}}catch(error){if(backendRequired)throw error;}
   try{
     const remote=await serverState();
     state=remote||seed();serverBacked=true;persistent=true;
-    const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault;
+    const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault||!state.office.buildings||state.office.floors.some(f=>!f.buildingId);
     state.people??=enrichPeople();state.office??=createOffice(state.people);
     upgradeOffice(state.office);
+    ensureBuildings(state.office);
     state.vault??=[{id:'share-folder',title:'Общая папка',notes:'Добавьте рабочие данные после настройки сервера.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'path',label:'Сетевой путь',value:'',secret:false},{id:'contact',label:'Ответственный',value:'',secret:false}]}];state.vaultTrash??=[];
     state.demoCredentials??=Object.fromEntries(state.people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]));
     if(!remote||needsMigration)await serverPersist(state);
     return state;
   }catch(error){
+    if(backendRequired)throw error;
     serverBacked=false;
   }
   try{
@@ -37,14 +43,15 @@ export async function initialize(){
     const saved=await new Promise((resolve,reject)=>{const r=db.transaction('workspace').objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     state=saved||seed();persistent=true;
     // Add the editable office without touching existing articles or drafts.
-    const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault;
+    const needsMigration=!state.office||!state.people||!state.demoCredentials||state.office.version<2||!state.vault||!state.office.buildings||state.office.floors.some(f=>!f.buildingId);
     state.people??=enrichPeople();state.office??=createOffice(state.people);
     upgradeOffice(state.office);
+    ensureBuildings(state.office);
     state.vault??=[{id:'share-folder',title:'Общая папка',notes:'Сетевые пути и ответственные команды.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'path',label:'Сетевой путь',value:'',secret:false},{id:'contact',label:'Ответственный',value:'',secret:false}]},{id:'internal-service',title:'Внутренний сервис',notes:'Ссылки, логины и скрытые значения в одной записи.',updatedAt:'2026-10-22T00:00:00Z',fields:[{id:'url',label:'URL',value:'',secret:false},{id:'login',label:'Логин',value:'',secret:false},{id:'password',label:'Пароль',value:'',secret:true}]}];state.vaultTrash??=[];
     state.demoCredentials??=Object.fromEntries(state.people.map((p,i)=>[p.id,`Demo-Only-${i+1}!`]));
     if(!saved||needsMigration)await persist(state);
   }catch{state??=seed();persistent=false;}
-  state.vault??=[];state.vaultTrash??=[];return state;
+  state.vault??=[];state.vaultTrash??=[];ensureBuildings(state.office);return state;
 }
 async function persist(next){
   if(serverBacked){await serverPersist(next);return;}
@@ -53,8 +60,10 @@ async function persist(next){
 }
 let saving=Promise.resolve();
 export function update(mutator){
-  const task=saving.then(async()=>{const next=structuredClone(state);mutator(next);await persist(next);state=next;return state;});saving=task.catch(()=>{});return task;
+  const task=saving.then(async()=>{for(let attempt=0;attempt<3;attempt++){const next=structuredClone(state);mutator(next);try{await persist(next);state=next;return state;}catch(error){if(!error.conflict||!serverBacked||attempt===2)throw error;state=await serverState();ensureBuildings(state.office);}}});saving=task.catch(()=>{});return task;
 }
+export function exportWorkspace(){const blob=new Blob([JSON.stringify({format:'compass-workspace',version:1,state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='compass-workspace.compass';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+export async function importWorkspace(payload){const imported=payload?.format==='compass-workspace'?payload.state:payload;if(!imported||!Array.isArray(imported.articles)||!Array.isArray(imported.people)||!Array.isArray(imported.office?.floors)||!Array.isArray(imported.users))throw new Error('Файл не содержит рабочего пространства Compass.');await update(next=>{for(const key of Object.keys(next))delete next[key];Object.assign(next,structuredClone(imported));next.settings??={};next.links??=[];next.favorites??=[];next.drafts??={};next.demoCredentials??={};next.vault??=[];next.vaultTrash??=[];upgradeOffice(next.office);ensureBuildings(next.office);});}
 export function exportSnapshot(){const {demoCredentials,vault,vaultTrash,...data}=state;return{schemaVersion:3,exportedAt:new Date().toISOString(),...data,vault:redactVault(vault||[])};}
 export function exportData(){const blob=new Blob([JSON.stringify(exportSnapshot(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`compass-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export function textContent(html){const doc=new DOMParser().parseFromString(html,'text/html');return doc.body.textContent||'';}

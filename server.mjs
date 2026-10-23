@@ -8,28 +8,19 @@ const root = path.resolve(fileURLToPath(new URL('./dist/', import.meta.url)));
 const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.svg':'image/svg+xml', '.json':'application/json; charset=utf-8', '.woff2':'font/woff2' };
 const port = Number(process.env.PORT || 4173);
 const databaseUrl = process.env.COMPASS_DATABASE_URL || process.env.DATABASE_URL || '';
-const pool = databaseUrl ? new Pool({connectionString:databaseUrl,ssl:process.env.COMPASS_DB_SSL==='true'?{rejectUnauthorized:false}:undefined}) : null;
+const production=process.env.NODE_ENV==='production';
+const username=process.env.COMPASS_AUTH_USER||'admin',password=process.env.COMPASS_AUTH_PASSWORD||'';
+if(production&&(!databaseUrl||!process.env.COMPASS_SECRET||!password))throw new Error('Production requires COMPASS_DATABASE_URL, COMPASS_SECRET and COMPASS_AUTH_PASSWORD.');
+const pool = databaseUrl ? new Pool({connectionString:databaseUrl,connectionTimeoutMillis:5000,ssl:process.env.COMPASS_DB_SSL==='true'?{rejectUnauthorized:true}:undefined}) : null;
+pool?.on('error',error=>console.error('PostgreSQL pool:',error.message));
 let databaseState = databaseUrl ? 'connecting' : 'not_configured';
 
-const schema = `
-CREATE TABLE IF NOT EXISTS compass_workspace_state (
-  workspace_id text PRIMARY KEY,
-  state jsonb NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS compass_ai_settings (
-  workspace_id text PRIMARY KEY,
-  provider text NOT NULL,
-  model text NOT NULL DEFAULT '',
-  base_url text NOT NULL DEFAULT '',
-  api_key_cipher text NOT NULL DEFAULT '',
-  updated_at timestamptz NOT NULL DEFAULT now()
-);`;
+const schema=await readFile(new URL('./docs/runtime-schema.sql',import.meta.url),'utf8');
 
 async function initializeDatabase(){
   if(!pool)return;
   try{await pool.query(schema);databaseState='connected';}
-  catch(error){databaseState='error';console.error('PostgreSQL is unavailable:',error.message);}
+  catch(error){databaseState='error';console.error('PostgreSQL is unavailable:',error.message);if(production)throw error;}
 }
 const json=(res,status,payload)=>{const body=JSON.stringify(payload);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(body);};
 const readBody=req=>new Promise((resolve,reject)=>{let body='';req.setEncoding('utf8');req.on('data',chunk=>{body+=chunk;if(body.length>20*1024*1024)reject(new Error('Request is too large'));});req.on('end',()=>{try{resolve(body?JSON.parse(body):{});}catch{reject(new Error('Invalid JSON'));}});req.on('error',reject);});
@@ -46,16 +37,23 @@ async function askProvider(config,question,context=''){
   const text=await response.text();if(!response.ok)throw new Error(`${config.provider}: ${response.status} ${text.slice(0,300)}`);let data;try{data=JSON.parse(text);}catch{throw new Error('Провайдер вернул некорректный ответ');}return data.choices?.[0]?.message?.content||'Провайдер не вернул текст ответа.';
 }
 async function api(req,res,pathname){
-  if(pathname==='/api/status'&&req.method==='GET')return json(res,200,{database:databaseState,persistence:databaseState==='connected'});
+  if((pathname==='/api/status'||pathname==='/api/health')&&req.method==='GET'){
+    if(pool)try{await pool.query('SELECT 1');databaseState='connected';}catch{databaseState='error';}
+    return json(res,pathname==='/api/health'&&databaseState!=='connected'?503:200,{runtime:'server',database:databaseState,persistence:databaseState==='connected'});
+  }
   if(!pathname.startsWith('/api/'))return false;
   if(databaseState!=='connected')return json(res,503,{error:'PostgreSQL не настроен или недоступен.',database:databaseState});
   if(pathname==='/api/state'&&req.method==='GET'){
-    const result=await pool.query('SELECT state FROM compass_workspace_state WHERE workspace_id=$1',['default']);
-    return result.rows[0]?json(res,200,{state:result.rows[0].state}):json(res,404,{state:null});
+    const result=await pool.query('SELECT state,revision FROM compass_workspace_state WHERE workspace_id=$1',['default']);
+    return result.rows[0]?json(res,200,{state:result.rows[0].state,revision:result.rows[0].revision}):json(res,404,{state:null});
   }
   if(pathname==='/api/state'&&req.method==='PUT'){
-    const body=await readBody(req);if(!body.state||typeof body.state!=='object')return json(res,400,{error:'state is required'});
-    await pool.query('INSERT INTO compass_workspace_state(workspace_id,state) VALUES($1,$2) ON CONFLICT(workspace_id) DO UPDATE SET state=EXCLUDED.state,updated_at=now()',['default',body.state]);return json(res,200,{ok:true});
+    const body=await readBody(req),state=body.state;
+    if(!state||!Array.isArray(state.articles)||!Array.isArray(state.people)||!Array.isArray(state.office?.floors)||!Array.isArray(state.users))return json(res,400,{error:'Некорректное рабочее пространство.'});
+    if(!Number.isInteger(body.revision)||body.revision<0)return json(res,400,{error:'Укажите версию рабочего пространства.'});
+    const result=await pool.query('INSERT INTO compass_workspace_state(workspace_id,state,revision) VALUES($1,$2,1) ON CONFLICT(workspace_id) DO UPDATE SET state=EXCLUDED.state,revision=compass_workspace_state.revision+1,updated_at=now() WHERE compass_workspace_state.revision=$3 RETURNING revision',['default',state,body.revision]);
+    if(!result.rows.length)return json(res,409,{error:'Данные изменились в другом окне. Обновляем рабочее пространство.'});
+    return json(res,200,{ok:true,revision:result.rows[0].revision});
   }
   if(pathname==='/api/ai/settings'&&req.method==='GET'){
     const settings=await aiSettings();return json(res,200,{provider:settings?.provider||'gigachat',model:settings?.model||providerDefaults.gigachat.model,baseUrl:settings?.baseUrl||providerDefaults.gigachat.baseUrl,configured:Boolean(settings?.apiKey),updatedAt:settings?.updatedAt||null});
@@ -70,15 +68,29 @@ async function api(req,res,pathname){
   }
   return json(res,404,{error:'API route not found'});
 }
+function authorized(req,res){
+  if(!password)return true;
+  const supplied=String(req.headers.authorization||'').replace(/^Basic /i,'');
+  let decoded='';try{decoded=Buffer.from(supplied,'base64').toString('utf8');}catch{}
+  const digest=value=>crypto.createHash('sha256').update(value).digest();
+  if(crypto.timingSafeEqual(digest(decoded),digest(username+':'+password)))return true;
+  res.writeHead(401,{'WWW-Authenticate':'Basic realm="Compass", charset="UTF-8"','Cache-Control':'no-store'}).end('Authentication required');return false;
+}
 const server = http.createServer(async (req,res) => {
   try {
+    if(!authorized(req,res))return;
+    if(!['GET','HEAD','OPTIONS'].includes(req.method)&&req.headers.origin){const allowed=process.env.COMPASS_PUBLIC_URL||('http://'+req.headers.host);if(req.headers.origin!==allowed){json(res,403,{error:'Недопустимый источник запроса.'});return;}}
+    res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','SAMEORIGIN');
     const pathname = decodeURIComponent(new URL(req.url,'http://localhost').pathname);
     if(pathname.startsWith('/api/')){await api(req,res,pathname);return;}
     const target = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
     if(!target.startsWith(root + path.sep) && target !== path.join(root,'index.html')) {res.writeHead(403).end();return;}
     const body = await readFile(target);
     res.writeHead(200, {'Content-Type':types[path.extname(target)] || 'application/octet-stream','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(body);
-  } catch(error) {if(!res.headersSent)json(res,error.message==='Request is too large'?413:500,{error:error.message||'Server error'});}
+  } catch(error) {if(!res.headersSent)json(res,error.message==='Request is too large'?413:error.message==='Invalid JSON'?400:error.code==='ENOENT'?404:500,{error:error.message||'Server error'});}
 });
 await initializeDatabase();
-server.listen(port,'127.0.0.1',()=>console.log(`Local: http://127.0.0.1:${port} · PostgreSQL: ${databaseState}`));
+server.listen(port,process.env.HOST||'127.0.0.1',()=>console.log(`Local: http://127.0.0.1:${port} · PostgreSQL: ${databaseState}`));
+
+async function shutdown(){server.close(async()=>{await pool?.end();process.exit(0);});setTimeout(()=>process.exit(1),10000).unref();}
+process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);

@@ -2,20 +2,21 @@ import {snapSeatPosition,validateSeatPosition,snapObjectPosition,validateObject,
 import {resizeLayout,validateLayoutResize} from './map-resize.js';
 
 /** SVG coordinates stay independent of screen size and the current zoom. */
-export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,select,render,report,isActive}){
+export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,previewEntity,select,render,report,isActive}){
   let drag=null,pinch=null;
   const screenPoint=point=>point.view||point;
   const preview=()=>{
     if(drag?.seat){
       const el=svg.querySelector(`[data-seat="${drag.seat.id}"]`);
       el?.setAttribute('transform',`translate(${drag.seat.x} ${drag.seat.y})`);
+      previewEntity?.('seat',drag.seat.id,drag.seat);
       el?.classList.remove('dragging','drag-invalid');
       const label=el?.querySelector('.seat-coordinate');
       if(label)label.textContent=`X ${drag.seat.x} · Y ${drag.seat.y}`;
     }
     if(drag?.room&&previewRoom)previewRoom(drag.room);
     if(drag?.room&&!previewRoom)svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${drag.room.x} ${drag.room.y})`);
-    if(drag?.object)svg.querySelector(`[data-object="${drag.object.id}"]`)?.setAttribute('transform',`translate(${drag.object.x} ${drag.object.y})`);
+    if(drag?.object){svg.querySelector(`[data-object="${drag.object.id}"]`)?.setAttribute('transform',`translate(${drag.object.x} ${drag.object.y})`);previewEntity?.('object',drag.object.id,drag.object);}
     if(drag?.resize)previewResize?.({floor:drag.floor,origin:{x:0,y:0}});
     svg.querySelectorAll('.map-object.dragging,.office-room.drag-invalid').forEach(el=>el.classList.remove('dragging','drag-invalid'));
     svg.classList?.remove('map-resize-invalid');
@@ -24,7 +25,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
   svg.addEventListener('pointerleave',()=>map.canvasHovered=false);
   svg.addEventListener('pointerdown',event=>{
     if(event.button!==0)return;
-    event.target.setPointerCapture(event.pointerId);
+    (svg.setPointerCapture?svg:event.target).setPointerCapture(event.pointerId);
     map.gestures.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(map.gestures.size===2){
       preview();
@@ -65,7 +66,10 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     }
     if(!drag||map.gestures.size!==1)return;
     let dx=event.clientX-drag.start.x,dy=event.clientY-drag.start.y;
-    const currentPoint=toWorld(event.clientX,event.clientY),currentView=screenPoint(currentPoint),startView=screenPoint(drag.point),worldDx=currentPoint.x-drag.point.x,worldDy=currentPoint.y-drag.point.y,viewDx=currentView.x-startView.x,viewDy=currentView.y-startView.y;
+    const currentPoint=toWorld(event.clientX,event.clientY),worldDx=currentPoint.x-drag.point.x,worldDy=currentPoint.y-drag.point.y;
+    // Pan uses the scale captured at pointerdown; the moving camera must not
+    // feed back into the next pointer delta.
+    const viewDx=dx*(drag.point.scale||1),viewDy=dy*(drag.point.scale||1);
     if(Math.hypot(dx,dy)>5)map.moved=true;
     if(!map.moved)return;
     map.dragging=true;
@@ -83,6 +87,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       drag.nextObject={...drag.object,...point};drag.error='';
       try{validateObject(getFloor(),drag.nextObject);}catch(error){drag.error=error.message;}
       const el=svg.querySelector(`[data-object="${drag.object.id}"]`);el.setAttribute('transform',`translate(${point.x} ${point.y})`);el.classList.add('dragging');
+      previewEntity?.('object',drag.object.id,point);
       report(drag.error||`${drag.object.name} · X ${point.x} · Y ${point.y}`,!!drag.error);
     }else if(drag.seat){
       const horizontal=Math.abs(dx)>=Math.abs(dy);
@@ -93,6 +98,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       try{validateSeatPosition(getFloor(),drag.seat.id,point.x,point.y);}catch(error){drag.error=error.message;}
       const el=svg.querySelector(`[data-seat="${drag.seat.id}"]`);
       el.setAttribute('transform',`translate(${point.x} ${point.y})`);
+      previewEntity?.('seat',drag.seat.id,point);
       el.classList.add('dragging');el.classList.toggle('drag-invalid',!!drag.error);
       const label=el.querySelector('.seat-coordinate');if(label)label.textContent=`X ${point.x} · Y ${point.y}`;
       report(drag.error||`X ${point.x} · Y ${point.y}`,!!drag.error);

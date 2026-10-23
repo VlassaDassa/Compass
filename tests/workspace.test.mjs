@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createOffice} from '../dist/office-model.js';
+import {createBuilding,ensureBuildings,addEmployeeAtSeat} from '../dist/workspace-model.js';
+import {safeAccent,contrast,normalizeAppearance} from '../dist/appearance.js';
+
+test('old floor assignments migrate into one building without changing the layout',()=>{const office=createOffice([]),seats=structuredClone(office.floors[0].seats);ensureBuildings(office);ensureBuildings(office);assert.equal(office.buildings.length,1);assert.ok(office.floors.every(f=>f.buildingId===office.buildings[0].id));assert.deepEqual(office.floors[0].seats,seats);});
+test('each new building has an independent first floor',()=>{const office=createOffice([]);ensureBuildings(office);const result=createBuilding(office,'Южный корпус','south','south-1');assert.equal(result.buildingId,'south');assert.equal(office.floors.at(-1).buildingId,'south');assert.equal(office.floors.at(-1).number,1);assert.equal(office.floors.at(-1).seats.length,0);assert.throws(()=>createBuilding(office,'южный корпус'),/уже есть/);});
+test('creating an employee and assigning a seat is atomic on invalid placement',()=>{const office=createOffice([]),state={office,people:[]};ensureBuildings(office);const f=office.floors[0],seat={id:'fresh',roomId:f.rooms[0].id,number:'new',x:45,y:110};assert.throws(()=>addEmployeeAtSeat(state,f.id,seat,{id:'p',name:'Иван Тестов',department:'ИТ'}),/другое рабочее место/);assert.equal(state.people.length,0);assert.ok(!f.seats.some(s=>s.id==='fresh'));});
+test('inline employee is created and assigned in one transaction',()=>{const office=createOffice([]),state={office,people:[]};const f=office.floors[0],seat={...f.seats[0]};const result=addEmployeeAtSeat(state,f.id,seat,{id:'new',name:'Иван Тестов',department:'ИТ',email:'test@example.test'});assert.equal(result.personId,'new');assert.equal(state.people[0].name,'Иван Тестов');assert.equal(f.seats[0].personId,'new');});
+test('all accent colors are kept readable on the dark input surface',()=>{for(const color of ['#000000','#080520','#ff0000','#00ff00','#0000ff','#666666','#ffffff'])assert.ok(contrast(safeAccent(color),'#201a2d')>=4.5,color);assert.equal(normalizeAppearance({hue:900}).hue,360);assert.equal(safeAccent('url(evil)'),'#ae96f0');});
