@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import path from 'node:path';
+import {readFile} from 'node:fs/promises';
+import {once} from 'node:events';
+import {chromium} from 'playwright-core';
+import {initialArticles,initialUsers,people} from '../dist/data.js';
+import {createOffice,upgradeOffice} from '../dist/office-model.js';
+import {ensureBuildings} from '../dist/workspace-model.js';
+import {appearanceVersion,defaultAppearance} from '../dist/appearance.js';
+
+// Reproduce a returning visitor to the static Site: existing IndexedDB + stale assets.
+// The browser context and HTTP server are isolated; no application database is used.
+const root=path.resolve('dist'),legacy={hue:267,bg:'#131016',paper:'#211a2b',raised:'#30263e',field:'#160f20',ink:'#faf7ff',muted:'#c8bdd7',line:'#69547e',accent:'#bc91ff',accentInk:'#160d22',artColor:'#a574e5',autoContrast:false,art:32,grain:12,motion:false,smooth:true};
+const fixture={articles:structuredClone(initialArticles),users:structuredClone(initialUsers),people:structuredClone(people),office:createOffice(people),settings:{appearance:legacy,center:'Сохранённый корпус'},links:[{id:'keep-link',title:'Не удалять',url:'https://example.test'}],favorites:[],drafts:{keep:{title:'Мой черновик'}},vault:[],vaultTrash:[],demoCredentials:{}};
+upgradeOffice(fixture.office);ensureBuildings(fixture.office);
+const server=http.createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://local').pathname;if(pathname.startsWith('/api/')){res.writeHead(404,{'Content-Type':'application/json'}).end('{}');return;}
+  if(pathname==='/legacy-cache.html'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end('<link rel="stylesheet" href="/workspace-design.css"><script type="module" src="/appearance.js"></script><label>Имя и фамилия</label><input value="Садовников Владислав Алексеевич">');return;}
+  if(pathname==='/workspace-design.css'){res.writeHead(200,{'Content-Type':'text/css','Cache-Control':'public, max-age=31536000, immutable'}).end('body{background:#211a2b;color:#faf7ff;padding:40px;font:16px sans-serif}label{display:block;margin-bottom:12px;color:#c8bdd7}input{background:#160f20;color:#faf7ff;border:1px solid #69547e;border-radius:8px;padding:14px;width:460px;font:inherit}');return;}
+  if(pathname==='/appearance.js'){res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'public, max-age=31536000, immutable'}).end('export const oldCachedTheme=true;');return;}
+  const target=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));if(!target.startsWith(root+path.sep)){res.writeHead(403).end();return;}const body=await readFile(target),types={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[path.extname(target)]||'application/octet-stream','Cache-Control':pathname.startsWith('/assets/')?'public, max-age=31536000, immutable':'no-store'}).end(body);
+}catch(error){res.writeHead(error.code==='ENOENT'?404:500).end();}});
+let browser;
+try{
+  server.listen(0,'127.0.0.1');await once(server,'listening');const origin='http://127.0.0.1:'+server.address().port;
+  browser=await chromium.launch({executablePath:process.env.COMPASS_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',req=>requests.push(new URL(req.url()).pathname));
+  await page.goto(origin+'/legacy-cache.html');await page.screenshot({path:'/tmp/compass-theme-before.png'});
+  await page.evaluate(async state=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('compass-knowledge-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});await new Promise((resolve,reject)=>{const t=db.transaction('workspace','readwrite');t.objectStore('workspace').put(state,'state');t.oncomplete=resolve;t.onerror=()=>reject(t.error);});db.close();},fixture);
+  requests.length=0;
+  await page.goto(origin+'/#/settings');await page.locator('#appearance-form').waitFor();await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(350);
+  const readState=()=>page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('compass-knowledge-v1',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const state=await new Promise((resolve,reject)=>{const r=db.transaction('workspace').objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});db.close();return state;});
+  const migrated=await readState();assert.equal(migrated.settings.appearance.version,appearanceVersion);assert.equal(migrated.settings.appearance.paper,defaultAppearance.paper);assert.deepEqual(migrated.settings.appearancePrevious,legacy);assert.equal(migrated.settings.center,fixture.settings.center);for(const key of ['articles','users','people','office','links','favorites','drafts','vault','vaultTrash'])assert.deepEqual(migrated[key],fixture[key],key+' must be unchanged');
+  assert.equal(await page.locator('.appearance-panel').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(16, 17, 20)');assert.ok(!requests.includes('/appearance.js'));assert.ok(!requests.includes('/workspace-design.css'));assert.ok(!requests.includes('/app.js'));assert.ok(requests.some(p=>/^\/assets\/app-/.test(p)));
+  await page.screenshot({path:'/tmp/compass-theme-migrated.png',fullPage:true});
+  await page.goto(origin+'/#/settings?tab=users');await page.locator('[data-action=add-user]').click();await page.locator('#user-name').fill('Садовников Владислав Алексеевич');await page.locator('#user-name').evaluate(e=>e.blur());assert.equal(await page.locator('#user-name').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(11, 12, 15)');await page.locator('.modal').screenshot({path:'/tmp/compass-theme-field.png'});
+  await page.goto(origin+'/#/settings');await page.locator('#appearance-restore').click();await page.locator('#toast').filter({hasText:'Прежняя палитра восстановлена'}).waitFor();await page.reload();await page.locator('#appearance-form').waitFor();assert.equal(await page.locator('#appearance-paper').inputValue(),legacy.paper);assert.equal((await readState()).settings.appearance.version,appearanceVersion);
+  await page.locator('#appearance-reset').click();await page.locator('#toast').filter({hasText:'Тёмная графитовая тема восстановлена'}).waitFor();await page.locator('#appearance-autoContrast').uncheck();await page.locator('#appearance-paper').fill('#15202b');await page.locator('#appearance-form').getByRole('button',{name:'Сохранить',exact:true}).click();await page.locator('#toast').filter({hasText:'Оформление сохранено'}).waitFor();await page.reload();await page.locator('#appearance-form').waitFor();assert.equal(await page.locator('#appearance-paper').inputValue(),'#15202b');assert.deepEqual((await readState()).settings.appearancePrevious,legacy);
+  await page.goto(origin+'/#/editor');await page.locator('.tiptap').waitFor();assert.deepEqual(errors,[]);
+  console.log('Returning visitor: cached legacy CSS/modules cannot override the new build; IndexedDB theme upgrades once, original colors remain recoverable, other records are unchanged, custom edits survive reload and editor chunks load.');
+}finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

@@ -71,6 +71,7 @@ html[data-motion=false] .ambient-background:before{animation:none}.appearance-co
 .workspace-picker>svg,.sidebar-note>svg,.sidebar-note .online,.top-actions>.avatar{color:var(--muted)}.top-actions>.avatar{background:var(--raised)}
 .workspace-picker>svg:first-child,.workspace-picker>svg:last-child{color:var(--muted)}.top-divider{background:var(--line)}
 .field input::placeholder,.field textarea::placeholder,.search-field input::placeholder,.custom-select-popover input::placeholder{color:var(--muted);opacity:1}
+.appearance-backup{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}.appearance-backup p{font-size:12px;line-height:1.7}.appearance-backup .btn{flex:none}@media(max-width:760px){.appearance-backup{align-items:stretch;flex-direction:column}.appearance-backup .btn{white-space:normal}}
 #toast{background:var(--raised);color:var(--ink);border-color:var(--line)}.overlay{background:#000b}
 .office-viewport.isometric :is(.caption-plate,.caption-room .caption-plate,.caption-marker .caption-plate,.caption-building .caption-plate,.caption-missing .caption-plate){fill:var(--paper);stroke:var(--line)}
 .office-viewport.isometric :is(.caption-text,.caption-room .caption-text,.caption-marker .caption-text,.caption-building .caption-text){fill:var(--ink)}.office-viewport.isometric .caption-missing .caption-text{fill:var(--muted)}

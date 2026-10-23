@@ -1,0 +1,69 @@
+/* Neutral architectural plan, with materials carried by SVG furniture. */
+.office-viewport{background:#1b1e23;height:560px}
+.map-floor-fill{fill:#292e32}
+.map-edit-grid{display:none;pointer-events:none}
+.editing .map-edit-grid{display:block}
+.map-floor-edge{stroke:#626a70;stroke-dasharray:5 7;stroke-width:1;vector-effect:non-scaling-stroke}
+.map-floor-label{fill:#b5bbc1;letter-spacing:1px;font-size:15px}
+.office-room.map-zone>.office-room-bg{fill:var(--zone-fill);stroke:none;filter:drop-shadow(0 4px 3px #070a0d88)}
+.office-room.map-zone.selected>.office-room-bg{stroke:none}
+.room-walls{fill:none;pointer-events:none;stroke-linecap:butt;stroke-linejoin:miter}
+.wall-shadow{stroke:#0c111666;stroke-width:15;transform:translateY(2px)}
+.wall-body{stroke:#8d9394;stroke-width:10}
+.wall-highlight{stroke:#d9dbce77;stroke-width:1.2;transform:translate(1.5px,-1.5px)}
+.rotated-room-caption{transform:translateY(-57px)}
+.room-floor-grain{pointer-events:none;opacity:.7}
+.room-wall-inset{fill:none;stroke:#e5e5d955;stroke-width:1;pointer-events:none}
+.office-room.map-zone .office-room-title-bg{fill:#292d30b3;stroke:none}
+.office-room.map-zone .office-room-name{fill:#eeece6;font-size:18px;font-weight:550}
+.office-room.map-zone .office-room-type{fill:#b6bbbd;font-size:12px}
+.office-room.map-zone.open-zone>.office-room-bg{stroke:#798187;stroke-width:1;stroke-opacity:0;fill:#393d3e;fill-opacity:1;filter:none}
+.office-room.map-zone.open-zone .room-wall-inset{display:none}
+.editing .office-room.map-zone.open-zone>.office-room-bg{stroke-opacity:.6;stroke-dasharray:7 6}
+.office-room.map-zone.open-zone .office-room-title-bg{fill:none}
+.office-seat .seat-hit{stroke:none;fill:transparent}
+.office-viewport.editing .office-seat.selected .seat-hit{stroke:none;fill:transparent}
+.office-seat.free .workstation-art{opacity:.7}
+.office-seat-person{fill:#f0eee8;font-size:16px;paint-order:stroke;stroke:#34383b;stroke-width:3;stroke-linejoin:round}
+.office-seat.free .office-seat-person{fill:#bfc5c7}
+.office-seat-number{fill:#bfc6c9;font-size:12px;paint-order:stroke;stroke:#34383b;stroke-width:3}
+.map-object .object-symbol{fill:none;stroke:none;stroke-width:1}
+.map-object .object-label{fill:#d6d8d6;font-size:14px;paint-order:stroke;stroke:#34383b;stroke-width:3;stroke-linejoin:round}
+.map-object:hover .object-symbol{filter:brightness(1.08)}
+.map-object.selected .object-hit,.map-object:focus-visible .object-hit{stroke:#e8c77f;fill:none;stroke-width:1.5}
+.editing .map-object.selected .object-hit{stroke:none;fill:none}
+.map-object .object-hit{pointer-events:all;stroke:transparent;stroke-width:12px;vector-effect:non-scaling-stroke}
+.map-object .object-symbol{pointer-events:none}
+.map-move-grip{cursor:grab;pointer-events:all}
+.map-move-grip rect{fill:#252b32;stroke:#e5c77e;stroke-width:1.2}
+.map-move-grip path{fill:none;stroke:#efd595;stroke-width:2.2;stroke-linecap:round;pointer-events:none}
+.map-move-grip:hover rect{fill:#484337}
+.map-object.dragging .map-move-grip{cursor:grabbing}
+.map-object.kind-door:not(.selected) .object-label,.map-object.kind-window:not(.selected) .object-label{display:none}
+.map-marker{background:#ae9878;border-color:#d3c1a4}
+.map-marker.landmark{background:#79868e;border-color:#abb6bc}
+.resize-selection{fill:none;stroke:#f0cd82;stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none}
+.office-svg .map-resize-edge{fill:none;stroke:transparent;stroke-width:12px;stroke-linecap:square;vector-effect:non-scaling-stroke;pointer-events:stroke;outline:none}
+.office-svg .map-resize-edge:hover,.office-svg .map-resize-edge:focus-visible{stroke:#f5d18b55}
+.office-svg .map-resize-edge.n,.office-svg .map-resize-edge.s{cursor:ns-resize}
+.office-svg .map-resize-edge.e,.office-svg .map-resize-edge.w{cursor:ew-resize}
+.office-svg .map-resize-edge.nw,.office-svg .map-resize-edge.se{cursor:nwse-resize;stroke-width:20px}
+.office-svg .map-resize-edge.ne,.office-svg .map-resize-edge.sw{cursor:nesw-resize;stroke-width:20px}
+.map-resize-invalid .resize-selection{stroke:#ffa89b}
+.map-resize-invalid .map-resize-edge:hover{stroke:#ff8c7d55}
+.office-room.map-zone.drag-invalid>.office-room-bg{stroke:#db9a8f}
+.office-viewport.hand-tool .map-resize-edge{pointer-events:none}
+@media(max-width:760px){
+  .office-viewport{height:410px}
+  .office-svg .map-resize-edge{stroke-width:20px}
+  .office-svg .map-resize-edge.nw,.office-svg .map-resize-edge.ne,.office-svg .map-resize-edge.sw,.office-svg .map-resize-edge.se{stroke-width:26px}
+  .office-seat-person{font-size:19px}
+  .office-seat-number{font-size:14px}
+  .office-room.map-zone .office-room-name{font-size:21px}
+}
+
+/* Keep the map's visual treatment in front of the base map stylesheet. */
+.office-viewport{height:600px;background:#091117;border-color:#2c444b;box-shadow:inset 0 1px #ffffff08,0 22px 55px #0007}
+.map-floor-fill{fill:#101b22}.office-room.map-zone>.office-room-bg{filter:url(#map-soft-shadow);stroke:#54706f33}.office-room.map-zone .office-room-title-bg{fill:#102329d9}.wall-shadow{stroke:#03090cbb;stroke-width:18}.wall-body{stroke:#567374;stroke-width:11}.wall-highlight{stroke:#c1e0d36b;stroke-width:1.4}.office-seat.selected .office-desk-body,.office-seat:hover .office-desk-body{fill:#3a8f7b;stroke:#a9efcf}.office-seat .office-seat-person{fill:#ecfff7;stroke:#102127}.map-object.selected .object-hit,.map-object:focus-visible .object-hit{stroke:#d9ee78}.office-zoom-controls{background:#12222bf2;border-color:#42645f;box-shadow:0 10px 30px #0008}.office-zoom-controls .icon-btn{color:#b6f0d6}.office-zoom-controls output{color:#b6d8cf}
+@media(min-width:1800px){.office-viewport{height:680px}}
+@media(max-width:760px){.office-viewport{height:430px}}
