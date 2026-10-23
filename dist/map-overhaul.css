@@ -54,27 +54,50 @@
 .office-seat-row{border-color:#1f3940}
 .office-seat-row:hover{background:#153239}
 .office-seat-row small{color:#88aaa9}
-.office-viewport.isometric .iso-volume{pointer-events:none;filter:drop-shadow(0 7px 5px #02070a99)}
-.office-viewport.isometric .iso-volume-shadow{fill:#02060899;stroke:none}
-.office-viewport.isometric .iso-volume-face{stroke:#071419;stroke-width:1.2}
-.office-viewport.isometric .iso-volume-face-right{fill:#17383d}
-.office-viewport.isometric .iso-volume-face-front{fill:#10292f}
-.office-viewport.isometric .iso-volume-edge{fill:none;stroke:#7ab5a9;stroke-opacity:.65;stroke-width:1.1}
-.office-viewport.isometric .iso-volume.kind-table .iso-volume-face-right{fill:#7a5139}
-.office-viewport.isometric .iso-volume.kind-table .iso-volume-face-front{fill:#583a2d}
-.office-viewport.isometric .iso-volume.kind-printer .iso-volume-face-right{fill:#768d91}
-.office-viewport.isometric .iso-volume.kind-printer .iso-volume-face-front{fill:#4c6268}
-.office-viewport.isometric .iso-volume.kind-cabinet .iso-volume-face-right{fill:#415d63}
-.office-viewport.isometric .iso-volume.kind-cabinet .iso-volume-face-front{fill:#2b454c}
-.office-viewport.isometric .iso-volume.kind-sofa .iso-volume-face-right{fill:#326875}
-.office-viewport.isometric .iso-volume.kind-sofa .iso-volume-face-front{fill:#234b58}
-.office-viewport.isometric .iso-volume.kind-plant .iso-volume-face-right{fill:#41634d}
-.office-viewport.isometric .iso-volume.kind-plant .iso-volume-face-front{fill:#294538}
-.office-viewport.isometric .iso-volume.kind-workstation .iso-volume-face-right{fill:#8b6041}
-.office-viewport.isometric .iso-volume.kind-workstation .iso-volume-face-front{fill:#68442f}
-.office-viewport.isometric .iso-volume.kind-marker .iso-volume-face-right{fill:#887556}
-.office-viewport.isometric .iso-volume.kind-marker .iso-volume-face-front{fill:#5d503d}
-.office-viewport.isometric .iso-volume.kind-door .iso-volume-face-right,.office-viewport.isometric .iso-volume.kind-window .iso-volume-face-right{fill:#294c54}
-.office-viewport.isometric .iso-volume.kind-door .iso-volume-face-front,.office-viewport.isometric .iso-volume.kind-window .iso-volume-face-front{fill:#1c363e}
+.office-viewport.isometric .model-3d{pointer-events:none;overflow:visible;filter:drop-shadow(0 7px 4px #02070a99);shape-rendering:geometricPrecision}
+.office-viewport.isometric .model-3d .model-face{stroke:#08171c;stroke-width:1.25;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.office-viewport.isometric .model-3d .model-side-a{fill:#22464a}
+.office-viewport.isometric .model-3d .model-side-b{fill:#143239}
+.office-viewport.isometric .model-3d .model-top{fill:#527d78}
+.office-viewport.isometric .model-3d .model-edge{fill:none;stroke:#b8e2d0;stroke-opacity:.55;stroke-width:1;vector-effect:non-scaling-stroke}
+.office-viewport.isometric .model-3d .model-panel{stroke:#071318;stroke-width:1;vector-effect:non-scaling-stroke}
+.office-viewport.isometric .model-3d .material-wood .model-top{fill:url(#model-wood-top)}
+.office-viewport.isometric .model-3d .material-wood .model-side-a{fill:#9b6547}
+.office-viewport.isometric .model-3d .material-wood .model-side-b{fill:#603c30}
+.office-viewport.isometric .model-3d .material-metal .model-top{fill:url(#model-metal-top)}
+.office-viewport.isometric .model-3d .material-metal .model-side-a{fill:#84999d}
+.office-viewport.isometric .model-3d .material-metal .model-side-b{fill:#4e666d}
+.office-viewport.isometric .model-3d .material-case .model-top{fill:url(#model-case-top)}
+.office-viewport.isometric .model-3d .material-case .model-side-a{fill:#73888d}
+.office-viewport.isometric .model-3d .material-case .model-side-b{fill:#3b555e}
+.office-viewport.isometric .model-3d .material-case-dark{fill:#324b52}
+.office-viewport.isometric .model-3d .material-case-dark .model-top{fill:#526a6d}
+.office-viewport.isometric .model-3d .material-case-dark .model-side-a{fill:#263f47}
+.office-viewport.isometric .model-3d .material-case-dark .model-side-b{fill:#1a2d35}
+.office-viewport.isometric .model-3d .material-dark .model-top{fill:#28383f}
+.office-viewport.isometric .model-3d .material-dark .model-side-a{fill:#182a31}
+.office-viewport.isometric .model-3d .material-dark .model-side-b{fill:#0d1d24}
+.office-viewport.isometric .model-3d .material-screen{fill:url(#model-screen);stroke:#c7f8e9;stroke-opacity:.7}
+.office-viewport.isometric .model-3d .material-paper{fill:#eef5e9;stroke:#9eb4aa}
+.office-viewport.isometric .model-3d .material-fabric .model-top,.office-viewport.isometric .model-3d .material-fabric-light .model-top{fill:url(#model-fabric-top)}
+.office-viewport.isometric .model-3d .material-fabric .model-side-a,.office-viewport.isometric .model-3d .material-fabric-light .model-side-a{fill:#2b6470}
+.office-viewport.isometric .model-3d .material-fabric .model-side-b,.office-viewport.isometric .model-3d .material-fabric-light .model-side-b{fill:url(#model-fabric-side)}
+.office-viewport.isometric .model-3d .material-fabric-light .model-top{filter:brightness(1.16)}
+.office-viewport.isometric .model-3d .material-terracotta .model-top{fill:#bb7957}
+.office-viewport.isometric .model-3d .material-terracotta .model-side-a{fill:#834c3e}
+.office-viewport.isometric .model-3d .material-terracotta .model-side-b{fill:#5a3030}
+.office-viewport.isometric .model-3d .material-glass .model-top{fill:url(#model-screen);fill-opacity:.85}
+.office-viewport.isometric .model-3d .material-glass .model-side-a{fill:#377383}
+.office-viewport.isometric .model-3d .material-glass .model-side-b{fill:#1e4d5e}
+.office-viewport.isometric .model-3d .material-gold .model-top{fill:#e5c76e}
+.office-viewport.isometric .model-3d .material-gold .model-side-a{fill:#9a7540}
+.office-viewport.isometric .model-3d .material-gold .model-side-b{fill:#604326}
+.office-viewport.isometric .model-3d .material-wood-dark .model-top{fill:#82543e}
+.office-viewport.isometric .model-3d .material-wood-dark .model-side-a{fill:#59372f}
+.office-viewport.isometric .model-3d .material-wood-dark .model-side-b{fill:#38232a}
+.office-viewport.isometric .model-3d .model-panel.material-screen{fill:url(#model-screen)}
+.office-viewport.isometric .model-3d .model-leaf{fill:url(#model-plant);stroke:#0d302d;stroke-width:1;stroke-linejoin:round}
+.office-viewport.isometric .model-3d .model-leaf.material-leaf-light{filter:brightness(1.16)}
+.office-viewport.isometric .model-3d .model-leaf.material-leaf-dark{filter:brightness(.78)}
 @media(min-width:1800px){.office-viewport.isometric{height:720px}}
 @media(max-width:760px){.office-viewport.isometric{height:480px;min-height:390px}.office-map-top,.office-search-row,.office-map-bottom{padding-left:15px;padding-right:15px}.office-viewport.isometric .office-room.map-zone .office-room-name{font-size:21px}.office-viewport.isometric .office-seat-person{font-size:19px}}

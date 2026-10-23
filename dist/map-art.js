@@ -1,35 +1,155 @@
-import {objectKinds} from './office-model.js';
+// Lightweight 3D mesh artwork for the isometric office plan.
+// Every model is made from 3D vertices (x, y, z) and projected through the
+// same orthographic isometric camera as the floor. This keeps the map editable
+// without introducing a heavy runtime 3D engine or a second coordinate system.
+const ISO_Y=.46;
 
-// Top-down SVG furniture: shared materials keep the plan quiet and consistent.
 export const mapArtDefs=`
-<linearGradient id="map-wood" x2="0.15" y2="1"><stop stop-color="#e0bd91"/><stop offset=".55" stop-color="#c99a6d"/><stop offset="1" stop-color="#a97852"/></linearGradient>
-<linearGradient id="map-metal" x2="0" y2="1"><stop stop-color="#e5ecee"/><stop offset="1" stop-color="#aab9bf"/></linearGradient>
-<linearGradient id="map-case" x2=".2" y2="1"><stop stop-color="#fbfcfa"/><stop offset="1" stop-color="#c5d0d2"/></linearGradient>
-<linearGradient id="map-fabric" x2=".25" y2="1"><stop stop-color="#73a6b2"/><stop offset="1" stop-color="#3e6876"/></linearGradient>
-<linearGradient id="map-screen" x2=".7" y2="1"><stop stop-color="#b8e5e7"/><stop offset=".45" stop-color="#5f9da8"/><stop offset="1" stop-color="#2e6675"/></linearGradient>
-<linearGradient id="map-glass" x2="0" y2="1"><stop stop-color="#e6f6f5"/><stop offset=".5" stop-color="#8fcbd0"/><stop offset="1" stop-color="#4c8b99"/></linearGradient>
-<pattern id="map-floorboards" width="160" height="64" patternUnits="userSpaceOnUse"><rect width="160" height="64" fill="#172b32"/><path d="M0 0H160M0 32H160M80 0V32M20 32V64" stroke="#6b9690" stroke-opacity=".13"/><path d="M0 2H160M0 34H160" stroke="#b4e0cf" stroke-opacity=".08"/></pattern>
-<filter id="map-soft-shadow" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#34505b" flood-opacity=".24"/></filter>
+<linearGradient id="map-wood" x2=".1" y2="1"><stop stop-color="#f1c98f"/><stop offset=".52" stop-color="#c9935f"/><stop offset="1" stop-color="#8b5a3e"/></linearGradient>
+<linearGradient id="model-wood-top" x2=".1" y2="1"><stop stop-color="#f1c98f"/><stop offset=".52" stop-color="#c9935f"/><stop offset="1" stop-color="#8b5a3e"/></linearGradient>
+<linearGradient id="model-wood-side" x2="0" y2="1"><stop stop-color="#9b6345"/><stop offset="1" stop-color="#59382d"/></linearGradient>
+<linearGradient id="model-metal-top" x2="0" y2="1"><stop stop-color="#f1f5f1"/><stop offset="1" stop-color="#a8b9bc"/></linearGradient>
+<linearGradient id="model-case-top" x2=".2" y2="1"><stop stop-color="#dfe8e4"/><stop offset="1" stop-color="#899ca0"/></linearGradient>
+<linearGradient id="model-screen" x2=".7" y2="1"><stop stop-color="#c8fbf2"/><stop offset=".45" stop-color="#55a8b1"/><stop offset="1" stop-color="#183f52"/></linearGradient>
+<linearGradient id="model-fabric-top" x2=".2" y2="1"><stop stop-color="#65b1b1"/><stop offset="1" stop-color="#286171"/></linearGradient>
+<linearGradient id="model-fabric-side" x2="0" y2="1"><stop stop-color="#234b59"/><stop offset="1" stop-color="#102a35"/></linearGradient>
+<linearGradient id="model-plant" x2=".2" y2="1"><stop stop-color="#91c07f"/><stop offset="1" stop-color="#2d664d"/></linearGradient>
 `;
 
-export function furnitureArt(kind,width,height){
-  const shapes={
-    door:`<path d="M-2 100H102" stroke="#34383b" stroke-width="17"/><path d="M2 100V4" stroke="#14191d" stroke-width="10"/><rect x="1" y="3" width="7" height="94" rx="1" fill="url(#map-wood)" stroke="#d0bea1"/><path d="M9 7A92 92 0 0 1 100 99" fill="none" stroke="#b9b4a7" stroke-width="1.2" stroke-dasharray="4 5" opacity=".5"/><path d="M0 100H8M94 100H102" stroke="#c3c6c4" stroke-width="7"/><path d="M8 17h5" stroke="#ded9cc" stroke-width="2"/>`,
-    window:`<rect width="100" height="100" rx="4" fill="#303940" stroke="#c0c5c4" stroke-width="3"/><rect x="3" y="12" width="94" height="76" fill="url(#map-glass)"/><path d="M3 15H97M3 85H97M50 10V90" stroke="#d5dbd9" stroke-width="3"/><path d="M13 22L28 74M65 22L80 74" stroke="#f5f8f5" stroke-width="3" opacity=".3"/><path d="M0 97H100" stroke="#d7d7cc" stroke-width="5"/>`,
-    printer:`<g filter="url(#map-soft-shadow)"><rect x="17" y="1" width="64" height="38" rx="3" fill="#333c42" stroke="#7e898d"/><rect x="23" y="3" width="51" height="29" rx="1" fill="#ecece4"/><path d="M29 10H66M29 16H62" stroke="#b5b9b5" stroke-width="1.5"/><rect x="3" y="26" width="94" height="63" rx="9" fill="url(#map-case)" stroke="#d0d4d0"/><rect x="11" y="34" width="78" height="22" rx="3" fill="#424c53"/><rect x="15" y="37" width="49" height="14" rx="2" fill="#596a70"/><rect x="70" y="37" width="12" height="8" rx="1" fill="#7d9997"/><circle cx="85" cy="49" r="1.8" fill="#b9d1b9"/><path d="M14 64H86" stroke="#7b8588" stroke-width="2"/><rect x="17" y="70" width="66" height="28" rx="3" fill="#303a41"/><path d="M23 75H77V94H23z" fill="#c8ccca"/><path d="M28 80H72M28 85H62" stroke="#8f9999" stroke-width="1.5"/></g>`,
-    table:`<g filter="url(#map-soft-shadow)"><path d="M12 18V92M88 18V92" stroke="#22282b" stroke-width="10"/><rect x="2" y="3" width="96" height="90" rx="16" fill="#695b4a" stroke="#4c443a"/><rect x="2" y="1" width="96" height="87" rx="16" fill="url(#map-wood)" stroke="#ccb899" stroke-width="1.3"/><path d="M18 13H82M9 27H91M7 62H93M18 78H82" stroke="#e7d8bb" stroke-width=".65" opacity=".18"/><rect x="43" y="36" width="14" height="18" rx="3" fill="#81715c" stroke="#c4b394" stroke-width=".7"/></g>`,
-    cabinet:`<g filter="url(#map-soft-shadow)"><rect x="1" y="5" width="98" height="94" rx="3" fill="#605b53"/><rect x="1" y="1" width="98" height="92" rx="3" fill="url(#map-case)" stroke="#bcc1be"/><path d="M50 3V91M3 15H97" stroke="#69757a" stroke-width="1.5"/><rect x="41" y="41" width="3" height="20" rx="1.5" fill="#40484b"/><rect x="56" y="41" width="3" height="20" rx="1.5" fill="#40484b"/><path d="M4 88H96" stroke="#ecede4" opacity=".3"/></g>`,
-    plant:`<g filter="url(#map-soft-shadow)"><circle cx="50" cy="53" r="30" fill="#807365" stroke="#a99b86" stroke-width="3"/><circle cx="50" cy="53" r="23" fill="#34332b"/><g stroke="#87977c" stroke-width="1"><path d="M50 54Q8 54 14 18Q49 16 50 54" fill="#5f745d"/><path d="M50 54Q34 5 65 7Q83 32 50 54" fill="#74886b"/><path d="M50 54Q69 12 91 35Q87 62 50 54" fill="#536b56"/><path d="M50 54Q100 58 78 85Q46 87 50 54" fill="#6d805f"/><path d="M50 54Q48 96 20 80Q10 50 50 54" fill="#526c56"/><path d="M50 54L23 27M50 54L64 19M50 54L81 38M50 54L73 76M50 54L27 74" fill="none" opacity=".65"/></g></g>`,
-    sofa:`<g filter="url(#map-soft-shadow)"><rect x="5" y="2" width="90" height="91" rx="12" fill="#353e45" stroke="#7b8489"/><rect x="9" y="4" width="82" height="26" rx="8" fill="url(#map-fabric)" stroke="#899195" stroke-width="1"/><rect x="12" y="32" width="37" height="56" rx="7" fill="url(#map-fabric)" stroke="#7b858b"/><rect x="51" y="32" width="37" height="56" rx="7" fill="url(#map-fabric)" stroke="#7b858b"/><rect x="0" y="22" width="12" height="76" rx="5" fill="url(#map-fabric)" stroke="#929b9e"/><rect x="88" y="22" width="12" height="76" rx="5" fill="url(#map-fabric)" stroke="#929b9e"/><path d="M17 38H43M57 38H83" stroke="#b4b9b9" stroke-opacity=".22"/></g>`,
-    marker:`<g filter="url(#map-soft-shadow)"><rect x="2" y="4" width="96" height="92" rx="12" fill="url(#map-metal)" stroke="#9aa2a7"/><circle cx="50" cy="48" r="25" fill="#2d363c" stroke="#c8b78d" stroke-width="2"/><path d="M50 45V66" stroke="#e4d5af" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="33" r="3" fill="#e4d5af"/></g>`
+const face=(className,points)=>`<path class="model-face ${className}" d="${points}"/>`;
+
+function projector(width,height,rotation=0){
+  const unit=Math.max(0.35,Math.min(width,height)/100);
+  const rotate=(x,y)=>{
+    if(rotation===90)return{x:height-y,y:x};
+    if(rotation===180)return{x:width-x,y:height-y};
+    if(rotation===270)return{x:y,y:width-x};
+    return{x,y};
   };
-  const natural=objectKinds[kind]||objectKinds.marker;
-  return `<svg class="furniture-art" width="${width}" height="${height}" viewBox="0 0 ${natural.width} ${natural.height}" preserveAspectRatio="xMidYMid meet" overflow="visible"><g transform="scale(${natural.width/100} ${natural.height/100})">${shapes[kind]||shapes.marker}</g></svg>`;
+  const point=(x,y,z=0)=>{const p=rotate(x,y);return{x:p.x-z/(2*ISO_Y),y:p.y-z/(2*ISO_Y)};};
+  const path=points=>points.map((p,index)=>`${index?'L':'M'}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')+'Z';
+  const line=points=>points.map((p,index)=>`${index?'L':'M'}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ');
+  const box=(x,y,w,d,top,bottom,material='neutral')=>{
+    const t=[point(x,y,top),point(x+w,y,top),point(x+w,y+d,top),point(x,y+d,top)];
+    const b=[point(x,y,bottom),point(x+w,y,bottom),point(x+w,y+d,bottom),point(x,y+d,bottom)];
+    return`<g class="model-box material-${material}">${face('model-side-a',path([t[1],t[2],b[2],b[1]]))}${face('model-side-b',path([t[2],t[3],b[3],b[2]]))}${face('model-top',path(t))}<path class="model-edge" d="${line([t[0],t[1],t[2],t[3],t[0]])}"/></g>`;
+  };
+  const panelY=(x,y,w,z0,z1,material='detail')=>face(`model-panel material-${material}`,path([point(x,y,z0),point(x+w,y,z0),point(x+w,y,z1),point(x,y,z1)]));
+  const panelX=(x,y,d,z0,z1,material='detail')=>face(`model-panel material-${material}`,path([point(x,y,z0),point(x,y+d,z0),point(x,y+d,z1),point(x,y,z1)]));
+  const leaf=(x,y,tx,ty,z0,z1,material='leaf')=>face(`model-leaf material-${material}`,path([point(x-unit*7,y,z0),point(tx,ty,z1),point(x+unit*7,y,z0)]));
+  const x=n=>width*n/100,y=n=>height*n/100,z=n=>n*unit;
+  return{width,height,rotation,unit,point,path,line,box,panelY,panelX,leaf,x,y,z};
 }
 
-export function workstationArt(width,height){return `<svg class="workstation-art" width="${width}" height="${height}" viewBox="0 0 120 75" preserveAspectRatio="xMidYMid meet" overflow="visible">
-<g filter="url(#map-soft-shadow)"><path d="M8 10V48M112 10V48" stroke="#242b30" stroke-width="6"/><rect x="2" y="3" width="116" height="45" rx="5" fill="#6b5f4e"/><rect x="2" y="0" width="116" height="43" rx="5" fill="url(#map-wood)" stroke="#cfbd9e" stroke-width="1.2"/><path d="M7 6H113M8 37H112" stroke="#e1cfab" opacity=".19"/>
-<path d="M60 14V24M49 24H71" stroke="#3b4245" stroke-width="3" stroke-linecap="round"/><rect x="39" y="5" width="42" height="19" rx="2" fill="#252e34" stroke="#899497" stroke-width="1"/><rect x="42" y="7" width="36" height="14" rx="1" fill="url(#map-screen)"/><path d="M44 9H73L44 17z" fill="#ced9d6" opacity=".12"/>
-<rect x="39" y="29" width="36" height="8" rx="2" fill="#d0d0c7" stroke="#777e7e" stroke-width=".7"/><path d="M43 31H71M43 34H71" stroke="#838b8b" stroke-width=".65"/><ellipse cx="85" cy="33" rx="4" ry="5" fill="#c7c8c1" stroke="#6a7475" stroke-width=".7"/><path d="M85 29V32" stroke="#768387"/>
-<rect x="10" y="11" width="13" height="23" rx="3" fill="#303a40" stroke="#738083" stroke-width=".8"/><rect x="12" y="14" width="9" height="6" rx="1" fill="#82928d"/><path d="M12 25H20M12 28H20" stroke="#a6ada6" stroke-width="1.2"/><rect x="99" y="7" width="10" height="25" rx="2" fill="#41494d" stroke="#8e9695" stroke-width=".8"/><circle cx="104" cy="12" r="1" fill="#b5c7b5"/>
-<path d="M60 57V71M48 72H72" stroke="#20272c" stroke-width="4" stroke-linecap="round"/><rect x="45" y="47" width="30" height="23" rx="8" fill="url(#map-fabric)" stroke="#7b858a"/><path d="M44 54H40V64M76 54H80V64" stroke="#2b333a" stroke-width="3" stroke-linecap="round"/><rect x="43" y="63" width="34" height="11" rx="5" fill="#4b555d" stroke="#899296" stroke-width=".8"/></g></svg>`;}
+function workstationMesh(p){
+  const{x,y,z,box,panelY}=p;
+  return[
+    box(x(2),y(5),x(96),y(55),z(35),z(29),'wood'),
+    box(x(7),y(10),x(6),y(6),z(29),0,'metal'),box(x(87),y(10),x(6),y(6),z(29),0,'metal'),
+    box(x(7),y(48),x(6),y(6),z(29),0,'metal'),box(x(87),y(48),x(6),y(6),z(29),0,'metal'),
+    box(x(35),y(9),x(31),y(13),z(59),z(36),'dark'),
+    panelY(x(39),y(22),x(23),z(42),z(56),'screen'),
+    box(x(39),y(28),x(31),y(12),z(39),z(35),'metal'),
+    box(x(9),y(13),x(14),y(20),z(48),z(35),'dark'),
+    box(x(78),y(12),x(12),y(18),z(46),z(35),'dark'),
+    box(x(38),y(63),x(25),y(25),z(18),z(5),'fabric'),
+    box(x(39),y(57),x(23),y(9),z(40),z(18),'fabric'),
+    panelY(x(43),y(64),x(15),z(21),z(28),'metal')
+  ].join('');
+}
+
+function tableMesh(p){
+  const{x,y,z,box}=p;
+  return[
+    box(x(3),y(8),x(94),y(80),z(42),z(34),'wood'),
+    box(x(9),y(14),x(7),y(7),z(34),0,'metal'),box(x(84),y(14),x(7),y(7),z(34),0,'metal'),
+    box(x(9),y(75),x(7),y(7),z(34),0,'metal'),box(x(84),y(75),x(7),y(7),z(34),0,'metal'),
+    box(x(44),y(43),x(12),y(14),z(45),z(42),'metal')
+  ].join('');
+}
+
+function printerMesh(p){
+  const{x,y,z,box,panelY}=p;
+  return[
+    box(x(9),y(21),x(82),y(58),z(27),0,'case'),
+    box(x(14),y(18),x(72),y(45),z(43),z(27),'case'),
+    box(x(25),y(7),x(50),y(25),z(59),z(43),'metal'),
+    panelY(x(22),y(62),x(56),z(29),z(40),'dark'),
+    panelY(x(29),y(63),x(42),z(31),z(38),'paper'),
+    box(x(26),y(70),x(48),y(12),z(42),z(40),'metal'),
+    box(x(71),y(28),x(9),y(10),z(46),z(43),'screen')
+  ].join('');
+}
+
+function cabinetMesh(p){
+  const{x,y,z,box,panelY,panelX}=p;
+  return[
+    box(x(8),y(8),x(84),y(84),z(76),0,'case'),
+    panelY(x(12),y(89),x(36),z(7),z(69),'case-dark'),panelY(x(52),y(89),x(36),z(7),z(69),'case-dark'),
+    panelY(x(48),y(89),x(4),z(5),z(72),'metal'),
+    box(x(39),y(82),x(4),y(4),z(40),z(33),'metal'),box(x(57),y(82),x(4),y(4),z(40),z(33),'metal'),
+    panelX(x(8),y(28),y(55),z(12),z(16),'metal')
+  ].join('');
+}
+
+function sofaMesh(p){
+  const{x,y,z,box}=p;
+  return[
+    box(x(5),y(24),x(90),y(61),z(19),0,'fabric'),
+    box(x(7),y(4),x(86),y(17),z(52),z(19),'fabric'),
+    box(x(0),y(19),x(13),y(70),z(43),z(8),'fabric'),box(x(87),y(19),x(13),y(70),z(43),z(8),'fabric'),
+    box(x(14),y(31),x(34),y(42),z(38),z(19),'fabric-light'),box(x(52),y(31),x(34),y(42),z(38),z(19),'fabric-light'),
+    box(x(18),y(35),x(26),y(5),z(41),z(38),'fabric-light'),box(x(56),y(35),x(26),y(5),z(41),z(38),'fabric-light')
+  ].join('');
+}
+
+function plantMesh(p){
+  const{x,y,z,box,leaf}=p;
+  return[
+    box(x(27),y(48),x(46),y(38),z(25),0,'terracotta'),
+    box(x(21),y(44),x(58),y(10),z(31),z(24),'terracotta'),
+    leaf(x(50),y(52),x(18),y(26),z(25),z(78),'leaf'),leaf(x(50),y(52),x(39),y(12),z(25),z(86),'leaf-light'),
+    leaf(x(50),y(52),x(74),y(15),z(25),z(82),'leaf'),leaf(x(50),y(52),x(88),y(34),z(25),z(72),'leaf-light'),
+    leaf(x(50),y(52),x(70),y(77),z(25),z(76),'leaf'),leaf(x(50),y(52),x(28),y(76),z(25),z(70),'leaf-dark')
+  ].join('');
+}
+
+function doorMesh(p){
+  const{x,y,z,box,panelY}=p;
+  return[
+    box(x(8),y(8),x(84),y(84),z(10),0,'wood-dark'),
+    box(x(13),y(13),x(74),y(74),z(15),z(10),'wood'),
+    panelY(x(19),y(87),x(62),z(15),z(54),'wood-dark'),
+    box(x(72),y(83),x(7),y(5),z(32),z(27),'metal')
+  ].join('');
+}
+
+function windowMesh(p){
+  const{x,y,z,box,panelY}=p;
+  return[
+    box(x(3),y(13),x(94),y(74),z(9),0,'metal'),
+    box(x(8),y(18),x(84),y(64),z(12),z(9),'glass'),
+    panelY(x(10),y(82),x(80),z(10),z(12),'metal'),
+    box(x(48),y(18),x(4),y(64),z(15),z(12),'metal'),
+    box(x(8),y(48),x(84),y(4),z(15),z(12),'metal')
+  ].join('');
+}
+
+function markerMesh(p){
+  const{x,y,z,box,panelY}=p;
+  return[
+    box(x(10),y(14),x(80),y(72),z(17),0,'metal'),
+    box(x(22),y(26),x(56),y(48),z(29),z(17),'dark'),
+    box(x(30),y(34),x(40),y(32),z(35),z(29),'gold'),
+    panelY(x(39),y(75),x(22),z(21),z(30),'gold')
+  ].join('');
+}
+
+function model3d(kind,width,height,rotation=0,extraClass='furniture-art'){
+  const p=projector(width,height,rotation),meshes={workstation:workstationMesh,table:tableMesh,printer:printerMesh,cabinet:cabinetMesh,sofa:sofaMesh,plant:plantMesh,door:doorMesh,window:windowMesh,marker:markerMesh};
+  const mesh=meshes[kind]||markerMesh;
+  return`<g class="${extraClass} model-3d model-${kind}" aria-hidden="true">${mesh(p)}</g>`;
+}
+
+export function furnitureArt(kind,width,height,rotation=0){return model3d(kind,width,height,rotation,'furniture-art');}
+export function workstationArt(width,height,rotation=0){return model3d('workstation',width,height,rotation,'workstation-art');}
