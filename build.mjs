@@ -7,4 +7,5 @@ for(const filename of await readdir('node_modules/@fontsource-variable/golos-tex
   if(filename.endsWith('.woff2'))await copyFile('node_modules/@fontsource-variable/golos-text/files/'+filename,'dist/fonts/'+filename);
 }
 await copyFile('node_modules/@fontsource-variable/golos-text/LICENSE','dist/fonts/LICENSE.txt');
+await copyFile('node_modules/three/LICENSE','dist/THREE-LICENSE.txt');
 console.log('Editor bundle ready. Static application: dist/');
