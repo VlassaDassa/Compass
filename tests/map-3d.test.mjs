@@ -28,7 +28,10 @@ test('a floor-level door cuts both sides of a shared boundary, but furniture nev
   assert.deepEqual(wallSegments(a,[a,b],[{...door,kind:'table'}]),wallSegments(a,[a,b]));
 });
 test('furniture has no cast or received shadows',()=>{
-  for(const kind of ['workstation','door','window','printer','cabinet','plant','sofa','marker','table'])createFurniture(kind,80,80).traverse(mesh=>{assert.equal(mesh.castShadow,false);assert.equal(mesh.receiveShadow,false);});
+  for(const kind of ['workstation','door','window','printer','cabinet','plant','sofa','marker','table','stairs'])createFurniture(kind,80,80).traverse(mesh=>{assert.equal(mesh.castShadow,false);assert.equal(mesh.receiveShadow,false);});
+});
+test('stairs are an actual stepped 3D mesh with an elevated landing and handrails',()=>{
+  const model=createFurniture('stairs',100,180),steps=[],rails=[];model.traverse(mesh=>{if(mesh.name==='stair-step')steps.push(mesh);if(mesh.name==='stair-handrail')rails.push(mesh);});assert.equal(steps.length,8);assert.equal(rails.length,4);assert.deepEqual(steps.map(m=>m.position.z*2),[8,16,24,32,40,48,56,64]);model.updateMatrixWorld(true);const bounds=new T.Box3().setFromObject(model);assert.ok(bounds.max.z>90);assert.ok(bounds.max.x<=101);assert.ok(bounds.max.y<=181);
 });
 test('zone plaques sit wholly outside the north edge and open corridors have no label',()=>{
   const floor={id:'f',width:1000,height:680,objects:[],seats:[],rooms:[{id:'r',name:'Команда',x:20,y:30,width:500,height:400},{id:'c',name:'Коридор',x:20,y:450,width:500,height:100,open:true}]};

@@ -42,10 +42,11 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     }
     if(map.gestures.size>2)return;
     map.moved=false;
-    const point=toWorld(event.clientX,event.clientY),floor=getFloor();
+    const point=toWorld(event.clientX,event.clientY);
     const editable=map.editing&&!map.spacePanning&&map.gestures.size===1;
     const handle=editable?event.target.closest('[data-resize-kind]'):null;
     const hit=targetAt(event);
+    const floor=getFloor(handle?{kind:handle.dataset.resizeKind,id:handle.dataset.resizeId}:hit);
     const seatId=editable&&!handle?(pick?(hit?.kind==='seat'?hit.id:null):event.target.closest('.office-seat')?.dataset.seat):null;
     const objectId=editable&&!handle&&!seatId?(pick?(hit?.kind==='object'?hit.id:null):event.target.closest('[data-object]')?.dataset.object):null;
     const zone=editable&&!handle&&!seatId&&!objectId?event.target.closest('[data-room-shape]'):null;
@@ -54,8 +55,8 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     const collection=resizeKind==='room'?floor.rooms:resizeKind==='seat'?floor.seats:floor.objects;
     const sized=handle&&resizeKind!=='floor'?collection?.find(r=>r.id===handle.dataset.resizeId):null;
     const resizeItem=resizeKind==='floor'?floor:sized;
-    drag={target:hit,start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,floor:handle?structuredClone(floor):null,resize:handle&&resizeItem?{kind:resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis}:null};
-    if(handle&&resizeKind!=='floor')select?.(resizeKind,resizeItem.id);
+    drag={target:hit,sourceFloor:floor,start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,floor:handle?structuredClone(floor):null,resize:handle&&resizeItem?{kind:resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis}:null};
+    if(handle)select?.(resizeKind,resizeItem.id);
     else if(seatId)select?.('seat',seatId);
     else if(objectId)select?.('object',objectId);
     else if(roomId)select?.('room',roomId);
@@ -89,20 +90,20 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
       report(drag.error||`Размер · ${drag.nextResize.width} × ${drag.nextResize.height}`,!!drag.error);
     }else if(drag.object){
       const horizontal=Math.abs(dx)>=Math.abs(dy);if(event.shiftKey){if(horizontal)dy=0;else dx=0;}
-      const point=snapObjectPosition(getFloor(),drag.object.id,drag.object.x+worldDx,drag.object.y+worldDy);
+      const point=snapObjectPosition(drag.sourceFloor,drag.object.id,drag.object.x+worldDx,drag.object.y+worldDy);
       if(event.shiftKey){if(horizontal)point.y=drag.object.y;else point.x=drag.object.x;}
       drag.nextObject={...drag.object,...point};drag.error='';
-      try{validateObject(getFloor(),drag.nextObject);}catch(error){drag.error=error.message;}
+      try{validateObject(drag.sourceFloor,drag.nextObject);}catch(error){drag.error=error.message;}
       const el=svg.querySelector(`[data-object="${drag.object.id}"]`);el.setAttribute('transform',`translate(${point.x} ${point.y})`);el.classList.add('dragging');
       previewEntity?.('object',drag.object.id,point);
       report(drag.error||`${drag.object.name} · X ${point.x} · Y ${point.y}`,!!drag.error);
     }else if(drag.seat){
       const horizontal=Math.abs(dx)>=Math.abs(dy);
       if(event.shiftKey){if(horizontal)dy=0;else dx=0;}
-      const point=snapSeatPosition(getFloor(),drag.seat.id,drag.seat.x+worldDx,drag.seat.y+worldDy);
+      const point=snapSeatPosition(drag.sourceFloor,drag.seat.id,drag.seat.x+worldDx,drag.seat.y+worldDy);
       if(event.shiftKey){if(horizontal)point.y=drag.seat.y;else point.x=drag.seat.x;}
       drag.nextSeat=point;drag.error='';
-      try{validateSeatPosition(getFloor(),drag.seat.id,point.x,point.y);}catch(error){drag.error=error.message;}
+      try{validateSeatPosition(drag.sourceFloor,drag.seat.id,point.x,point.y);}catch(error){drag.error=error.message;}
       const el=svg.querySelector(`[data-seat="${drag.seat.id}"]`);
       el.setAttribute('transform',`translate(${point.x} ${point.y})`);
       previewEntity?.('seat',drag.seat.id,point);
@@ -112,7 +113,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     }else if(drag.room){
       const x=Math.max(20,Math.round((drag.room.x+worldDx)/20)*20),y=Math.max(20,Math.round((drag.room.y+worldDy)/20)*20);
       drag.nextRoom={...drag.room,x,y};
-      drag.error='';try{validateRoom(getFloor(),drag.nextRoom);}catch(error){drag.error=error.message;}
+      drag.error='';try{validateRoom(drag.sourceFloor,drag.nextRoom);}catch(error){drag.error=error.message;}
       if(previewRoom){svg.setPointerCapture?.(event.pointerId);previewRoom(drag.nextRoom);}else svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.setAttribute('transform',`translate(${x} ${y})`);
       svg.querySelector(`[data-room-shape="${drag.room.id}"]`)?.classList.toggle('drag-invalid',!!drag.error);
       report(drag.error||`Зона · X ${x} · Y ${y}`,!!drag.error);

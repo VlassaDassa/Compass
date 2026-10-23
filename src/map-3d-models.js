@@ -79,9 +79,22 @@ function flag(g){
   const mesh=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:1.2,bevelEnabled:false}),materials.gold);
   mesh.rotation.x=Math.PI/2;mesh.position.set(18,28,81);g.add(mesh);
 }
+function stairs(g){
+  for(let i=0;i<8;i++){
+    const top=(i+1)*8;
+    box(g,5,i*18,0,90,18,top,'metal',.4).name='stair-step';
+    box(g,6,i*18,top-.5,88,2,1,'ivory',.2);
+  }
+  box(g,5,144,0,90,36,64,'metal',.4).name='stair-landing';
+  const rail=(a,b)=>{const direction=b.clone().sub(a),mesh=new T.Mesh(new T.CylinderGeometry(1.5,1.5,direction.length(),8),materials.ivory);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize());mesh.name='stair-handrail';g.add(mesh);};
+  for(const x of [3,97]){
+    for(const [y,z]of [[8,8],[62,32],[116,56],[174,64]])cylinder(g,x,y,z,1.3,1.3,30,'ivory',8);
+    rail(new T.Vector3(x,8,38),new T.Vector3(x,144,94));rail(new T.Vector3(x,144,94),new T.Vector3(x,174,94));
+  }
+}
 
 export function createFurniture(kind,width,height,rotation=0){
-  const definitions={workstation:[desk,120,100],table:[g=>desk(g,true),140,80],printer:[printer,76,70],cabinet:[cabinet,85,60],sofa:[sofa,130,65],plant:[plant,48,48],door:[door,80,80],window:[windowModel,110,16],marker:[flag,75,54]};
+  const definitions={workstation:[desk,120,100],table:[g=>desk(g,true),140,80],printer:[printer,76,70],cabinet:[cabinet,85,60],sofa:[sofa,130,65],plant:[plant,48,48],door:[door,80,80],window:[windowModel,110,16],marker:[flag,75,54],stairs:[stairs,100,180]};
   const [build,w,d]=definitions[kind]||definitions.marker,g=new T.Group();build(g);
   g.scale.set(width/w,height/d,Math.min(width/w,height/d));
   const pivot=new T.Group();pivot.add(g);pivot.rotation.z=rotation*Math.PI/180;

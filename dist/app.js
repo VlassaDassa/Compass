@@ -1,4 +1,4 @@
-import {applyAppearance,appearanceForm,defaultAppearance,installSmoothScroll} from './appearance.js';
+import {applyAppearance,appearanceForm,defaultAppearance,installSmoothScroll,readAppearanceForm,wireAppearanceForm} from './appearance.js';
 import {installCustomSelects,refreshCustomSelects,closeCustomSelect} from './custom-select.js';
 import {exportWorkspace,importWorkspace} from './store.js';
 import {categories,glossary} from './data.js';
@@ -119,8 +119,7 @@ function renderSettings(){const tab=params.get('tab')||'general';
  if(tab==='general'){
    target.insertAdjacentHTML('beforeend',appearanceForm(state.settings?.appearance));
    const form=$('#appearance-form');
-   const read=()=>({hue:$('#appearance-hue').value,accent:$('#appearance-accent').value,motion:$('#appearance-motion').checked,smooth:$('#appearance-smooth').checked});
-   form.addEventListener('input',()=>applyAppearance(read()));
+   const read=()=>readAppearanceForm(form);wireAppearanceForm(form);
    form.addEventListener('submit',event=>{event.preventDefault();safely(async()=>{const value=applyAppearance(read());await update(s=>{s.settings??={};s.settings.appearance=value;});toast('Оформление сохранено');});});
    $('#appearance-reset').addEventListener('click',()=>safely(async()=>{await update(s=>{s.settings??={};s.settings.appearance=defaultAppearance;});applyAppearance(defaultAppearance);renderSettings();toast('Фиолетовая тема восстановлена');}));
    target.insertAdjacentHTML('beforeend','<section class="panel"><h2>Перенос рабочего пространства</h2><p>Файл переноса содержит все данные, включая секреты. Храните его в безопасном месте и удалите после импорта на VPS.</p><div class="flex gap12"><button class="btn" id="workspace-export">Скачать файл переноса</button><label class="btn" for="workspace-import">Импортировать файл</label><input class="hidden" id="workspace-import" type="file" accept=".json,.compass"></div></section>');
@@ -167,7 +166,7 @@ async function publish(skipSimilar=false){
 
 function showModal(title,body,wide=false,onClose){
  closeCustomSelect();if($('#overlay-root').children.length)closeModal(true);modalReturnFocus=document.activeElement;modalCloseCallback=onClose;
- $('#overlay-root').innerHTML=`<div class="overlay"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal-header"><h2 id="modal-title">${title}</h2><button class="icon-btn" data-action="close-modal" aria-label="Закрыть окно">${icon('close')}</button></header><div class="modal-body">${body}</div></section></div>`;syncScrollLock();setTimeout(()=>{($('.modal input:not([type=hidden])')||$('.modal textarea')||$('.modal button')||$('.modal a'))?.focus({preventScroll:true});},20);
+ $('#overlay-root').innerHTML=`<div class="overlay"><section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal-header"><h2 id="modal-title">${title}</h2><button class="icon-btn" data-action="close-modal" aria-label="Закрыть окно">${icon('close')}</button></header><div class="modal-body">${body}</div></section></div>`;syncScrollLock();const shownModal=$('.modal');setTimeout(()=>{if(!shownModal.isConnected||shownModal.contains(document.activeElement))return;(shownModal.querySelector('input:not([type=hidden])')||shownModal.querySelector('textarea')||shownModal.querySelector('button')||shownModal.querySelector('a'))?.focus({preventScroll:true});},20);
  $('.overlay').addEventListener('mousedown',e=>{if(e.target===$('.overlay'))closeModal();});
 }
 let lockedScroll=null,lockedSticky=[];

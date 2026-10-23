@@ -145,8 +145,9 @@ function markerMesh(p){
   ].join('');
 }
 
+function stairsMesh(p){const{x,y,z,box}=p;return Array.from({length:8},(_,i)=>box(x(5),y(i*10),x(90),y(10),z((i+1)*8),0,'metal')).join('')+box(x(5),y(80),x(90),y(20),z(64),0,'metal');}
 function model3d(kind,width,height,rotation=0,extraClass='furniture-art'){
-  const p=projector(width,height,rotation),meshes={workstation:workstationMesh,table:tableMesh,printer:printerMesh,cabinet:cabinetMesh,sofa:sofaMesh,plant:plantMesh,door:doorMesh,window:windowMesh,marker:markerMesh};
+  const p=projector(width,height,rotation),meshes={workstation:workstationMesh,table:tableMesh,printer:printerMesh,cabinet:cabinetMesh,sofa:sofaMesh,plant:plantMesh,door:doorMesh,window:windowMesh,marker:markerMesh,stairs:stairsMesh};
   const mesh=meshes[kind]||markerMesh;
   return`<g class="${extraClass} model-3d model-${kind}" aria-hidden="true">${mesh(p)}</g>`;
 }

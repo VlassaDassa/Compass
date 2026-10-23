@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {createFurniture,createPlatform,createZoneWalls} from './map-3d-models.js';
 import {doorWallPlacement} from '../dist/map-walls.js';
+import {replaceCampusFloor} from '../dist/campus-model.js';
 
 const sx=.82,sy=.46,projectionScale=sx*Math.SQRT2;
 const cameraHeight=Math.sqrt(4*sy*sy/(projectionScale*projectionScale-2*sy*sy));
@@ -35,12 +36,15 @@ export function createOfficeRenderer(viewport){
     return{geometry,material};
   }
   function rebuild(floor,map){currentFloor=floor;currentMap=map;scene.remove(content);const previous=release(content);content=makeContent();entities=new Map();scene.add(content);
-    const base=createPlatform(floor.width,floor.height,26,0x211c32,0x151121);base.position.z=-12;base.userData.mapTarget={kind:'floor',id:floor.id};content.add(base);entities.set('floor:'+floor.id,base);
+    for(const plan of floor.plans||[{floor,x:0,y:0,width:floor.width,height:floor.height}]){
+    const local=plan.floor||{width:plan.width,height:plan.height,rooms:[],seats:[],objects:[]},platform=new T.Group();platform.position.set(plan.x,plan.y,0);content.add(platform);
+    const base=createPlatform(local.width,local.height,26,plan.floor?0x211c32:0x181523,0x151121);base.position.z=-12;base.userData.mapTarget=plan.floor?{kind:'floor',id:local.id}:{kind:'building',id:plan.building.id};platform.add(base);if(plan.floor)entities.set('floor:'+local.id,base);
     const zoneColors={teal:0x35454a,amber:0x51463f,violet:0x443d5b,coral:0x514047,blue:0x35445a,stone:0x3c3d47};
-    const parents=new Map();for(const room of [...floor.rooms].sort((a,b)=>Number(b.open)-Number(a.open))){const group=new T.Group();group.position.set(room.x,room.y,room.open?-4:0);group.userData.mapTarget={kind:'room',id:room.id};group.add(createPlatform(room.width,room.height,room.open?8:12,zoneColors[room.color]||0x443d5b,0x211b31),createZoneWalls(room,floor.rooms,floor.objects));parents.set(room.id,group);entities.set('room:'+room.id,group);content.add(group);}
-    const add=(kind,item,mesh)=>{const g=new T.Group(),parent=parents.get(item.roomId);g.position.set(item.x,item.y,parent?0:-12);g.userData.mapTarget={kind,id:item.id};g.add(mesh);(parent||content).add(g);entities.set(kind+':'+item.id,g);};
-    for(const seat of floor.seats)add('seat',seat,createFurniture('workstation',seat.width??120,seat.height??75,seat.rotation||0));
-    for(const object of floor.objects||[]){const mesh=createFurniture(object.kind,object.width,object.height,object.rotation||0),attachment=doorWallPlacement(object,floor.rooms);if(attachment)mesh.position.add(new T.Vector3(attachment.offset.x,attachment.offset.y,0));add('object',object,mesh);}
+    const parents=new Map();for(const room of [...local.rooms].sort((a,b)=>Number(b.open)-Number(a.open))){const group=new T.Group();group.position.set(room.x,room.y,room.open?-4:0);group.userData.mapTarget={kind:'room',id:room.id};group.userData.floorId=local.id;group.add(createPlatform(room.width,room.height,room.open?8:12,zoneColors[room.color]||0x443d5b,0x211b31),createZoneWalls(room,local.rooms,local.objects));parents.set(room.id,group);entities.set('room:'+room.id,group);platform.add(group);}
+    const add=(kind,item,mesh)=>{const g=new T.Group(),parent=parents.get(item.roomId);g.position.set(item.x,item.y,parent?0:-12);g.userData.mapTarget={kind,id:item.id};g.userData.floorId=local.id;g.add(mesh);(parent||platform).add(g);entities.set(kind+':'+item.id,g);};
+    for(const seat of local.seats)add('seat',seat,createFurniture('workstation',seat.width??120,seat.height??75,seat.rotation||0));
+    for(const object of local.objects||[]){const mesh=createFurniture(object.kind,object.width,object.height,object.rotation||0),attachment=doorWallPlacement(object,local.rooms);if(attachment)mesh.position.add(new T.Vector3(attachment.offset.x,attachment.offset.y,0));add('object',object,mesh);}
+    }
     const extent=Math.max(floor.width,floor.height);key.position.set(floor.width/2-extent,floor.height/2-extent,extent*1.7);key.target.position.set(floor.width/2,floor.height/2,0);
     const next=release(content);for(const value of previous.geometry)if(!next.geometry.has(value))value.dispose();for(const value of previous.material)if(!next.material.has(value))value.dispose();
     viewport.classList.add('webgl-ready');render();
@@ -51,5 +55,5 @@ export function createOfficeRenderer(viewport){
     for(const hit of raycaster.intersectObject(content,true)){if(!hit.object.isMesh)continue;let object=hit.object;while(object){if(object.userData.mapTarget)return object.userData.mapTarget;object=object.parent;}}
     return null;
   }
-  return{rebuild,render,pick,preview(kind,id,point){if(kind==='object'&&currentFloor.objects?.find(o=>o.id===id)?.kind==='door'){rebuild({...currentFloor,objects:currentFloor.objects.map(o=>o.id===id?{...o,...point}:o)},currentMap);return;}const entity=entities.get(kind+':'+id);if(entity){entity.position.x=point.x;entity.position.y=point.y;render();}},dispose(){const last=release(content);for(const g of last.geometry)g.dispose();for(const m of last.material)m.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();viewport.classList.remove('webgl-ready');}};
+  return{rebuild,render,pick,preview(kind,id,point){const entity=entities.get(kind+':'+id),source=currentFloor.plans?.find(p=>p.floor?.id===entity?.userData.floorId)?.floor||currentFloor;if(kind==='object'&&source.objects?.find(o=>o.id===id)?.kind==='door'){const next={...source,objects:source.objects.map(o=>o.id===id?{...o,...point}:o)};rebuild(currentFloor.plans?replaceCampusFloor(currentFloor,next):next,currentMap);return;}if(entity){entity.position.x=point.x;entity.position.y=point.y;render();}},dispose(){const last=release(content);for(const g of last.geometry)g.dispose();for(const m of last.material)m.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();viewport.classList.remove('webgl-ready');}};
 }

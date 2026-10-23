@@ -11,10 +11,11 @@ export function deleteBuilding(office,id){
   office.floors=office.floors.filter(f=>f.buildingId!==id);
   office.buildings=office.buildings.filter(b=>b.id!==id);
 }
-export function createBuilding(office,name,id=crypto.randomUUID(),floorId=crypto.randomUUID()){
+export function createBuilding(office,name,id=crypto.randomUUID(),floorId=crypto.randomUUID(),number=1){
   ensureBuildings(office);name=String(name||'').trim();if(!name)throw new Error('Укажите название корпуса.');
   if(office.buildings.some(b=>b.name.toLocaleLowerCase('ru')===name.toLocaleLowerCase('ru')))throw new Error('Корпус с таким названием уже есть.');
-  office.buildings.push({id,name});office.floors.push({id:floorId,buildingId:id,number:1,name:'1-й этаж',width:1000,height:680,rooms:[],seats:[],objects:[]});return{buildingId:id,floorId};
+  if(!Number.isInteger(number)||number<1||number>200)throw new Error('Номер этажа — от 1 до 200.');
+  office.buildings.push({id,name});office.floors.push({id:floorId,buildingId:id,number,name:number+'-й этаж',width:1000,height:680,rooms:[],seats:[],objects:[]});return{buildingId:id,floorId};
 }
 export function addEmployeeAtSeat(state,floorId,seat,employee){
   const floor=state.office.floors.find(f=>f.id===floorId);if(!floor)throw new Error('Этаж не найден.');
