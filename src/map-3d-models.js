@@ -8,11 +8,11 @@ const geometries=new Map();
 function box(g,x,y,z,w,d,h,material='metal',radius=0){
   const key=[w,d,h,radius].join('/');
   if(!geometries.has(key))geometries.set(key,radius?new RoundedBoxGeometry(w,d,h,2,Math.min(radius,w/3,d/3,h/3)):new T.BoxGeometry(w,d,h));
-  const mesh=new T.Mesh(geometries.get(key),materials[material]);mesh.position.set(x+w/2,y+d/2,z+h/2);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);return mesh;
+  const mesh=new T.Mesh(geometries.get(key),materials[material]);mesh.position.set(x+w/2,y+d/2,z+h/2);g.add(mesh);return mesh;
 }
 function cylinder(g,x,y,z,r1,r2,h,material='metal',segments=12){
   const geometry=new T.CylinderGeometry(r1,r2,h,segments);geometry.rotateX(Math.PI/2);
-  const mesh=new T.Mesh(geometry,materials[material]);mesh.position.set(x,y,z+h/2);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);return mesh;
+  const mesh=new T.Mesh(geometry,materials[material]);mesh.position.set(x,y,z+h/2);g.add(mesh);return mesh;
 }
 function desk(g,meeting=false){
   const w=meeting?140:120,d=meeting?80:58,h=42;
@@ -56,7 +56,7 @@ function plant(g){
   for(let i=0;i<9;i++){
     const angle=i*2.4,h=42+i*3;
     const leaf=new T.Mesh(new T.SphereGeometry(1,8,5),materials.leaf);
-    leaf.scale.set(5,14,2.5);leaf.position.set(24+Math.cos(angle)*10,24+Math.sin(angle)*10,h);leaf.rotation.set(.5*Math.cos(angle),.45*Math.sin(angle),angle);leaf.castShadow=true;g.add(leaf);
+    leaf.scale.set(5,14,2.5);leaf.position.set(24+Math.cos(angle)*10,24+Math.sin(angle)*10,h);leaf.rotation.set(.5*Math.cos(angle),.45*Math.sin(angle),angle);g.add(leaf);
   }
 }
 function door(g){
@@ -77,7 +77,7 @@ function flag(g){
   cylinder(g,16,28,0,13,16,5,'metal',18);cylinder(g,16,28,5,1.5,1.8,80,'ivory');
   const shape=new T.Shape();shape.moveTo(0,0);shape.lineTo(43,0);shape.lineTo(34,-15);shape.lineTo(43,-30);shape.lineTo(0,-30);shape.closePath();
   const mesh=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:1.2,bevelEnabled:false}),materials.gold);
-  mesh.rotation.x=Math.PI/2;mesh.position.set(18,28,81);mesh.castShadow=true;g.add(mesh);
+  mesh.rotation.x=Math.PI/2;mesh.position.set(18,28,81);g.add(mesh);
 }
 
 export function createFurniture(kind,width,height,rotation=0){
@@ -92,20 +92,20 @@ export function createFurniture(kind,width,height,rotation=0){
 export function createPlatform(width,height,depth,topColor,sideColor){
   const top=new T.MeshStandardMaterial({color:topColor,roughness:.94}),side=new T.MeshStandardMaterial({color:sideColor,roughness:.8});
   const geometry=new T.BoxGeometry(width,height,depth),mesh=new T.Mesh(geometry,[side,side,side,side,top,side]);
-  mesh.position.set(width/2,height/2,-depth/2);mesh.receiveShadow=true;mesh.castShadow=true;
+  mesh.position.set(width/2,height/2,-depth/2);
   const group=new T.Group();group.add(mesh);
   const border=new T.LineSegments(new T.EdgesGeometry(geometry),new T.LineBasicMaterial({color:0x81729e,transparent:true,opacity:.38}));border.position.copy(mesh.position);group.add(border);return group;
 }
 
-export function createZoneWalls(room,rooms){
+export function createZoneWalls(room,rooms,objects=[]){
   const group=new T.Group();if(room.open)return group;
-  const thickness=4,segments=wallSegments(room,rooms),material=new T.MeshStandardMaterial({color:0x746b86,roughness:.82});
+  const thickness=4,segments=wallSegments(room,rooms,objects),material=new T.MeshStandardMaterial({color:0x746b86,roughness:.82});
   for(const [side,parts]of Object.entries(segments))for(const [a,b]of parts){
     // The front boundary stays low so it never hides desks or chairs.
     const horizontal=side==='n'||side==='s',height=side==='n'||side==='w'?24:13;
     const mesh=new T.Mesh(new T.BoxGeometry(horizontal?b-a:thickness,horizontal?thickness:b-a,height),material);
     mesh.position.set(horizontal?(a+b)/2:side==='w'?thickness/2:room.width-thickness/2,horizontal?(side==='n'?thickness/2:room.height-thickness/2):(a+b)/2,height/2);
-    mesh.castShadow=true;mesh.receiveShadow=true;mesh.name='zone-wall';group.add(mesh);
+    mesh.name='zone-wall';group.add(mesh);
   }
   return group;
 }

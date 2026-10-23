@@ -23,9 +23,13 @@ const pathPolygon=points=>points.map((point,index)=>`${index?'L':'M'}${point.x} 
 const drop=point=>({x:point.x,y:point.y+ISO_DEPTH});
 const inverseMatrix=iso=>{const a=1/(2*iso.sx),b=-1/(2*iso.sx),c=1/(2*iso.sy),d=1/(2*iso.sy);return{a,b,c,d};};
 const readableLabel=(iso,x,y)=>{const m=inverseMatrix(iso),e=x-m.a*x-m.c*y,f=y-m.b*x-m.d*y;return`matrix(${m.a} ${m.b} ${m.c} ${m.d} ${e} ${f})`;};
-export function mapCaption(label,x,y,iso,escape,kind='room'){
-  const text=short(label,26),width=Math.max(62,text.length*7.5+22),m=inverseMatrix(iso);
-  return `<g class="map-caption caption-${kind}" data-map-caption="true" transform="translate(${x} ${y}) matrix(${m.a} ${m.b} ${m.c} ${m.d} 0 0)"><g class="caption-scale"><g transform="skewY(29)"><rect class="caption-plate" x="${-width/2}" y="0" width="${width}" height="25" rx="4"/><text class="caption-text" x="0" y="17" text-anchor="middle">${escape(text)}</text></g></g></g>`;
+export function zoneCaptionPlacement(room,rooms){
+  const blocked=side=>rooms.some(other=>{if(other.id===room.id||other.open)return false;const horizontal=side==='n'||side==='s',overlap=horizontal?other.x<room.x+room.width&&other.x+other.width>room.x:other.y<room.y+room.height&&other.y+other.height>room.y;if(!overlap)return false;const gap=side==='n'?room.y-other.y-other.height:side==='s'?other.y-room.y-room.height:side==='w'?room.x-other.x-other.width:other.x-room.x-room.width;return gap>=0&&gap<130;});
+  const side=['n','s','e','w'].find(side=>!blocked(side))||'n';return{side,x:side==='w'?0:side==='e'?room.width:room.width/2,y:side==='n'?0:side==='s'?room.height:room.height/2};
+}
+export function mapCaption(label,x,y,iso,escape,kind='room',side='n'){
+  const text=short(label,26),width=Math.max(62,text.length*7.5+22),m=inverseMatrix(iso),top=kind==='room'?(['s','e'].includes(side)?24:-64):0,angle=['w','e'].includes(side)?-29:29;
+  return `<g class="map-caption caption-${kind}" data-map-caption="true" data-caption-side="${side}" transform="translate(${x} ${y}) matrix(${m.a} ${m.b} ${m.c} ${m.d} 0 0)"><g class="caption-scale"><g transform="skewY(${angle})"><rect class="caption-plate" x="${-width/2}" y="${top}" width="${width}" height="25" rx="4"/><text class="caption-text" x="0" y="${top+17}" text-anchor="middle">${escape(text)}</text></g></g></g>`;
 }
 const extrusion=(iso,points,kind,style='')=>{const [,b,c,d]=points,faces=[[b,c,drop(c),drop(b)],[c,d,drop(d),drop(c)]];return`<g class="iso-extrusion ${kind}" style="${style}" aria-hidden="true"><path class="iso-face iso-face-right" d="${pathPolygon(faces[0])}"/><path class="iso-face iso-face-front" d="${pathPolygon(faces[1])}"/><path class="iso-edge" d="M${drop(b).x} ${drop(b).y}L${drop(c).x} ${drop(c).y}L${drop(d).x} ${drop(d).y}"/></g>`;};
 export function resizeHandles(kind,id,width,height,selected=true){
@@ -38,11 +42,11 @@ export function sceneSvg(floor,map,{escape,seatSvg}){
   const e=escape,iso=isoTransform(floor),worldTransform=isoMatrix(iso);
   const floorPoints=pointsForRect(iso,0,0,floor.width,floor.height);
   const roomSvg=room=>{
-    const color=palette(room.color),selected=map.roomId===room.id&&!map.seatId&&!map.objectId;
+    const color=palette(room.color),selected=map.roomId===room.id&&!map.seatId&&!map.objectId,caption=zoneCaptionPlacement(room,floor.rooms);
 
 
     const roomStyle=`--zone-ink:${color.ink};--zone-fill:${color.fill};--zone-header:${color.header}`;
-    return`<g class="office-room map-zone ${room.open?'open-zone':''} ${selected?'selected':''}" data-room-shape="${room.id}" data-map-kind="room" data-map-id="${room.id}" transform="translate(${room.x} ${room.y})" style="${roomStyle}"><rect class="office-room-bg" data-zone-body="true" width="${room.width}" height="${room.height}" rx="3" data-layout="select-room" data-room="${room.id}"/><g data-room-drag="${room.id}" data-layout="select-room" data-room="${room.id}" role="button" tabindex="0" aria-label="Зона ${e(room.name)}">${mapCaption(room.name,Math.min(room.width/2,120),-24,iso,e,'room')}</g>${map.editing?resizeHandles('room',room.id,room.width,room.height,selected):''}${floor.seats.filter(s=>s.roomId===room.id).map(seat=>seatSvg(seat,iso)).join('')}</g>`;
+    return`<g class="office-room map-zone ${room.open?'open-zone':''} ${selected?'selected':''}" data-room-shape="${room.id}" data-map-kind="room" data-map-id="${room.id}" transform="translate(${room.x} ${room.y})" style="${roomStyle}"><rect class="office-room-bg" data-zone-body="true" width="${room.width}" height="${room.height}" rx="3" data-layout="select-room" data-room="${room.id}"/>${room.open?'':`<g data-room-drag="${room.id}" data-layout="select-room" data-room="${room.id}" role="button" tabindex="0" aria-label="Зона ${e(room.name)}">${mapCaption(room.name,caption.x,caption.y,iso,e,'room',caption.side)}</g>`}${map.editing?resizeHandles('room',room.id,room.width,room.height,selected):''}${floor.seats.filter(s=>s.roomId===room.id).map(seat=>seatSvg(seat,iso)).join('')}</g>`;
   };
   const floorShell=`<g class="iso-floor-shell" aria-hidden="true"><path class="iso-floor-face" d="${pathPolygon([floorPoints[1],floorPoints[2],drop(floorPoints[2]),drop(floorPoints[1])])}"/><path class="iso-floor-face iso-floor-face-front" d="${pathPolygon([floorPoints[2],floorPoints[3],drop(floorPoints[3]),drop(floorPoints[2])])}"/><path class="iso-floor-edge" d="${pathPolygon(floorPoints)}"/></g>`;
   const roomShells=[...floor.rooms].sort((a,b)=>Number(b.open)-Number(a.open)).map(room=>{const color=palette(room.color),style=`--zone-ink:${color.ink};--zone-fill:${color.fill};--zone-header:${color.header}`;return extrusion(iso,pointsForRect(iso,room.x,room.y,room.width,room.height),`room ${room.open?'open':''}`,style);}).join('');

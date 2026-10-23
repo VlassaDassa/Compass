@@ -2,9 +2,14 @@ import {assignPerson,nextSeatPosition,seatSize,validateSeatPosition} from './off
 
 export function ensureBuildings(office){
   office.buildings??=[{id:'building-main',name:'Основной корпус'}];
-  if(!office.buildings.length)office.buildings.push({id:'building-main',name:'Основной корпус'});
-  for(const floor of office.floors)floor.buildingId??=office.buildings[0].id;
+  if(!office.buildings.length&&office.floors.length)office.buildings.push({id:'building-main',name:'Основной корпус'});
+  for(const floor of office.floors)if(!office.buildings.some(b=>b.id===floor.buildingId))floor.buildingId=office.buildings[0].id;
   return office;
+}
+export function deleteBuilding(office,id){
+  if(!office.buildings?.some(b=>b.id===id))throw new Error('Корпус не найден.');
+  office.floors=office.floors.filter(f=>f.buildingId!==id);
+  office.buildings=office.buildings.filter(b=>b.id!==id);
 }
 export function createBuilding(office,name,id=crypto.randomUUID(),floorId=crypto.randomUUID()){
   ensureBuildings(office);name=String(name||'').trim();if(!name)throw new Error('Укажите название корпуса.');

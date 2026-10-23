@@ -18,3 +18,19 @@ body:before{z-index:2;opacity:.18}
 .start-symbol{display:flex;justify-content:flex-end;align-items:center;min-height:93px}
 .start-symbol svg{width:90px;height:90px;transform:rotate(-45deg);stroke-width:.8}
 .text-link{color:var(--accent)}
+
+/* Scroll remains available by wheel, touch and keyboard, without visible rails. */
+.sidebar,.office-detail{scrollbar-width:none;scrollbar-gutter:auto}
+.sidebar::-webkit-scrollbar,.office-detail::-webkit-scrollbar{display:none;width:0;height:0}
+.map-building-manage{width:34px;height:40px;flex:none;color:var(--muted);border:1px solid var(--line)}
+.map-building-manage:hover{color:var(--accent);background:var(--raised)}
+.building-list{display:grid;gap:10px}.building-row{display:flex;align-items:center;gap:14px;padding:15px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}.building-row>div{flex:1;min-width:0}.building-row h3{font-size:15px;overflow-wrap:anywhere}.building-row p{font-size:12px;color:var(--muted);margin-top:5px}.building-row-icon{color:var(--accent);display:grid;place-items:center}.building-row-icon svg{width:23px;height:23px}.building-row .danger{color:#ef9da9;flex:none}
+#map-fullscreen-root{position:fixed;inset:0;z-index:1000;background:var(--bg);isolation:isolate;overflow:hidden;color:var(--ink)}
+#map-fullscreen-root::backdrop{background:var(--bg)}
+.map-expanded #map-fullscreen-root .office-plan-panel{position:absolute;inset:0;width:100%!important;height:100dvh!important;border:0;border-radius:0;margin:0;box-shadow:none;background:var(--paper)}
+.map-expanded #map-fullscreen-root .office-plan-panel:before{content:none}
+.map-expanded #map-fullscreen-root .office-map-top,.map-expanded #map-fullscreen-root .office-map-bottom{border-radius:0;background:var(--paper)}
+.map-expanded .ambient-background,.map-expanded:before,.map-expanded:after{display:none}
+html:has(body.map-expanded){scrollbar-gutter:auto;overflow:hidden;background:var(--bg)}
+.office-viewport .workstation-art,.office-viewport .workstation-art *,.office-viewport .object-symbol,.office-viewport .object-symbol *{filter:none!important}
+@media(max-height:850px) and (min-width:761px){.sidebar{padding-top:18px;padding-bottom:12px}.sidebar .brand-subtitle{margin:9px 6px 17px}.sidebar .workspace-picker{margin-bottom:17px}.sidebar .nav-link{padding-block:8px;min-height:35px}.sidebar .nav-label{margin-bottom:7px}.sidebar .nav-secondary{margin-top:19px}.sidebar .sidebar-note{margin-top:10px;padding-block:9px}.sidebar .sidebar-spacer{min-height:10px}.sidebar .profile{padding-top:12px}}

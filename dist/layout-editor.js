@@ -7,7 +7,7 @@ import {attachCanvasGestures} from './map-gestures.js';
 import {copyValue} from './copy-utils.js';
 import {rotateMapEntity,copyMapEntity,pasteMapEntity,deleteOfficeFloor} from './map-actions.js';
 import {createOfficeRenderer} from './map-3d.js';
-import {ensureBuildings,createBuilding,addEmployeeAtSeat} from './workspace-model.js';
+import {ensureBuildings,createBuilding,deleteBuilding,addEmployeeAtSeat} from './workspace-model.js';
 
 let ui,map,active=false,observer,menuAnchor,mapClipboard,pasteOffset=0,renderer;
 const undoStack=[],redoStack=[];
@@ -24,15 +24,17 @@ function bindForm(id,handler){$(id).addEventListener('submit',async event=>{even
 async function commit(mutator){let before;await update(s=>{before=structuredClone(s.office);mutator(s);});undoStack.push(before);if(undoStack.length>30)undoStack.shift();redoStack.length=0;syncHistoryButtons();}
 async function history(redo=false){
   if(map.dragging)return;
+  const session=map;
   const source=redo?redoStack:undoStack,target=redo?undoStack:redoStack;if(!source.length)return;
   const snapshot=source.at(-1),current=structuredClone(state.office);await update(s=>s.office=structuredClone(snapshot));source.pop();target.push(current);
+  if(!active||map!==session)return;
   if(!state.office.floors.some(f=>f.id===map.floorId))map.floorId=state.office.floors[0]?.id||'';
   map.camera=null;sanitizeSelection();renderPage();status(redo?'Действие повторено':'Последнее действие отменено');
 }
 function syncHistoryButtons(){if(!active)return;document.querySelectorAll('[data-layout="undo"]').forEach(el=>el.disabled=!undoStack.length);document.querySelectorAll('[data-layout="redo"]').forEach(el=>el.disabled=!redoStack.length);}
 export function clearLayoutHistory(){undoStack.length=0;redoStack.length=0;syncHistoryButtons();}
 function sanitizeSelection(){const f=floor();if(!f){map.seatId='';map.objectId='';map.roomId='';map.focusRoomId='';return;}if(!f.seats.some(s=>s.id===map.seatId))map.seatId='';if(!f.rooms.some(r=>r.id===map.roomId))map.roomId='';if(!f.rooms.some(r=>r.id===map.focusRoomId))map.focusRoomId='';if(!f.objects.some(o=>o.id===map.objectId))map.objectId='';}
-export function disposeLayoutMap(){active=false;observer?.disconnect();observer=null;renderer?.dispose();renderer=null;if(map?.nativeFullscreen&&document.fullscreenElement)document.exitFullscreen?.().catch(()=>{});if(map)map.expanded=false;document.body.classList.remove('map-workspace','map-expanded');closeLayoutMenu();map?.gestures.clear();}
+export function disposeLayoutMap(){active=false;observer?.disconnect();observer=null;renderer?.dispose();renderer=null;releaseMapFullscreen();document.body.classList.remove('map-workspace','map-expanded');closeLayoutMenu();map?.gestures.clear();}
 export function mountLayoutMap(options){
   ui=options;active=true;observer?.disconnect();ensureBuildings(state.office);
   const loc=locationForPerson(state.office,options.params?.get('person')),f=loc?.floor||state.office.floors.find(f=>f.id===map?.floorId)||state.office.floors[0];
@@ -42,17 +44,17 @@ export function mountLayoutMap(options){
 export function refreshLayoutMap(){if(active){sanitizeSelection();renderPage();}}
 function editorDock(){
   if(!map.editing)return '<span id="office-drag-status" class="office-map-help" role="status">Выберите объект на карте</span>';
-  return `<div class="map-dock-tools" aria-label="Инструменты карты">${button('add-room',icon('plus')+'Зона','title="Добавить зону"','dock-button')}${button('add-corridor','Проход','','dock-button')}${button('add-seat',icon('monitor')+'Место','','dock-button')}<details class="dock-menu"><summary>Объект ${icon('down')}</summary><div class="dock-palette">${Object.entries(objectKinds).map(([kind,d])=>button('add-object',d.name,`data-kind="${kind}"`,'dock-button')).join('')}</div></details><details class="dock-menu"><summary>План ${icon('down')}</summary><div class="dock-palette">${button('add-floor','Добавить этаж','','dock-button')}${button('add-building','Добавить корпус','','dock-button')}</div></details>${button('paste',icon('clipboard'),`aria-label="Вставить" ${mapClipboard?'':'disabled'}`,'icon-btn')}${button('undo',icon('undo'),'aria-label="Отменить" title="Ctrl Z"','icon-btn')}${button('redo',icon('redo'),'aria-label="Повторить" title="Ctrl Shift Z"','icon-btn')}</div><span id="office-drag-status" class="office-map-help" role="status">Потяните за край, чтобы изменить размер</span>`;
+  return `<div class="map-dock-tools" aria-label="Инструменты карты">${button('add-room',icon('plus')+'Зона','title="Добавить зону"','dock-button')}${button('add-corridor','Проход','','dock-button')}${button('add-seat',icon('monitor')+'Место','','dock-button')}<details class="dock-menu"><summary>Объект ${icon('down')}</summary><div class="dock-palette">${Object.entries(objectKinds).map(([kind,d])=>button('add-object',d.name,`data-kind="${kind}"`,'dock-button')).join('')}</div></details><details class="dock-menu"><summary>План ${icon('down')}</summary><div class="dock-palette">${button('add-floor','Добавить этаж','','dock-button')}</div></details>${button('paste',icon('clipboard'),`aria-label="Вставить" ${mapClipboard?'':'disabled'}`,'icon-btn')}${button('undo',icon('undo'),'aria-label="Отменить" title="Ctrl Z"','icon-btn')}${button('redo',icon('redo'),'aria-label="Повторить" title="Ctrl Shift Z"','icon-btn')}</div><span id="office-drag-status" class="office-map-help" role="status">Потяните за край, чтобы изменить размер</span>`;
 }
 function renderPage(){
-  closeLayoutMenu();observer?.disconnect();renderer?.dispose();renderer=null;document.body.classList.add('map-workspace');
+  closeLayoutMenu();observer?.disconnect();renderer?.dispose();renderer=null;if(map.expanded)$('#map-fullscreen-root .office-plan-panel')?.remove();document.body.classList.add('map-workspace');
   const f=floor();if(!f){renderEmptyMap();return;}map.buildingId=f.buildingId;map.iso=isoTransform(f);
   $('#main-content').innerHTML=`<div class="map-workspace-heading"><div><h1>Карта офиса</h1><span>Корпуса, рабочие места и команда</span></div>${button('toggle-edit',icon(map.editing?'check':'edit')+(map.editing?'Готово':'Редактировать'),'',map.editing?'btn btn-primary':'btn')}</div>
-  <div class="office-layout"><section class="office-plan-panel"><div class="office-map-top"><div class="map-location-selects"><select id="office-building" class="field-select" aria-label="Корпус">${state.office.buildings.map(b=>`<option value="${b.id}" ${b.id===map.buildingId?'selected':''}>${e(b.name)}</option>`).join('')}</select><select id="office-floor" class="field-select" aria-label="Этаж">${state.office.floors.filter(f=>f.buildingId===map.buildingId).map(f=>`<option value="${f.id}" ${f.id===map.floorId?'selected':''}>${e(f.name)}</option>`).join('')}</select></div><div class="map-view-controls"><div class="office-mode" role="group" aria-label="Вид карты">${button('mode-plan',icon('map'),`aria-label="Карта" aria-pressed="${map.mode==='plan'}"`,map.mode==='plan'?'active':'')}${button('mode-list',icon('list'),`aria-label="Список" aria-pressed="${map.mode==='list'}"`,map.mode==='list'?'active':'')}</div>${button('fullscreen',icon('expand'),`aria-label="${map.expanded?'Выйти из полноэкранного режима':'Карта на весь экран'}" title="${map.expanded?'Выйти · Esc':'Карта на весь экран'}" aria-pressed="${!!map.expanded}"`,'icon-btn map-fullscreen-toggle')}</div></div>
+  <div class="office-layout"><section class="office-plan-panel"><div class="office-map-top"><div class="map-location-selects"><select id="office-building" class="field-select" aria-label="Корпус">${state.office.buildings.map(b=>`<option value="${b.id}" ${b.id===map.buildingId?'selected':''}>${e(b.name)}</option>`).join('')}</select>${button('manage-buildings',icon('building'),'aria-label="Управление корпусами" title="Корпусы: добавить или удалить"','icon-btn map-building-manage')}<select id="office-floor" class="field-select" aria-label="Этаж">${state.office.floors.filter(f=>f.buildingId===map.buildingId).map(f=>`<option value="${f.id}" ${f.id===map.floorId?'selected':''}>${e(f.name)}</option>`).join('')}</select></div><div class="map-view-controls"><div class="office-mode" role="group" aria-label="Вид карты">${button('mode-plan',icon('map'),`aria-label="Карта" aria-pressed="${map.mode==='plan'}"`,map.mode==='plan'?'active':'')}${button('mode-list',icon('list'),`aria-label="Список" aria-pressed="${map.mode==='list'}"`,map.mode==='list'?'active':'')}</div>${button('fullscreen',icon('expand'),`aria-label="${map.expanded?'Выйти из полноэкранного режима':'Карта на весь экран'}" title="${map.expanded?'Выйти · Esc':'Карта на весь экран'}" aria-pressed="${!!map.expanded}"`,'icon-btn map-fullscreen-toggle')}</div></div>
   <div class="office-search-row"><label class="search-field">${icon('search')}<input id="office-search" type="search" placeholder="Сотрудник, зона или объект" aria-label="Найти на карте"></label></div><div id="office-search-results" class="office-search-results hidden"></div>
   <div id="office-viewport" class="office-viewport isometric ${map.editing?'editing':''} ${map.mode==='list'?'hidden':''}"><svg id="office-svg" class="office-svg" role="group" aria-label="Трёхмерная карта ${e(f.name)}"></svg></div><div id="office-seat-list" class="office-seat-list ${map.mode==='list'?'':'hidden'}"></div>
   <div class="office-map-bottom">${editorDock()}<div class="office-zoom-controls">${button('zoom-out','−','aria-label="Уменьшить карту"','icon-btn')}<output id="office-zoom" aria-label="Масштаб">100%</output>${button('zoom-in','+','aria-label="Увеличить карту"','icon-btn')}${button('fit',icon('map'),'aria-label="Вписать план"','icon-btn')}</div></div></section><aside id="office-detail" class="panel office-detail"></aside></div>`;
-  document.body.classList.toggle('map-expanded',!!map.expanded);
+  document.body.classList.toggle('map-expanded',!!map.expanded);if(map.expanded)syncFullscreenHost();
   renderer=createOfficeRenderer($('#office-viewport'));draw();renderList();refreshLayoutDetails();bindGestures();syncHistoryButtons();
   $('#office-floor').addEventListener('change',event=>changeFloor(event.target.value));
   $('#office-building').addEventListener('change',event=>{map.buildingId=event.target.value;const next=state.office.floors.find(f=>f.buildingId===map.buildingId);changeFloor(next?.id||'');});
@@ -61,7 +63,8 @@ function renderPage(){
 }
 function changeFloor(id){map.floorId=id;map.roomId='';map.focusRoomId='';map.seatId='';map.objectId='';map.camera=null;renderPage();}
 function renderEmptyMap(){
-  $('#main-content').innerHTML=`<div class="map-workspace-heading"><div><h1>Карта офиса</h1><span>Создайте план корпуса</span></div></div><div class="layout-edit-bar"><div class="layout-main-tools"><select id="empty-building" class="field-select" aria-label="Корпус">${state.office.buildings.map(b=>`<option value="${b.id}" ${b.id===map.buildingId?'selected':''}>${e(b.name)}</option>`).join('')}</select>${button('add-floor',icon('plus')+'Добавить этаж')}${button('add-building',icon('building')+'Добавить корпус')}${button('undo',icon('undo'),'aria-label="Отменить действие"','icon-btn')}</div></div><div class="empty"><h2>В корпусе пока нет этажей</h2><p>Добавьте этаж, чтобы начать размещать зоны и рабочие места.</p></div>`;
+  releaseMapFullscreen();
+  $('#main-content').innerHTML=`<div class="map-workspace-heading"><div><h1>Карта офиса</h1><span>Создайте план корпуса</span></div></div><div class="layout-edit-bar"><div class="layout-main-tools"><select id="empty-building" class="field-select" aria-label="Корпус">${state.office.buildings.map(b=>`<option value="${b.id}" ${b.id===map.buildingId?'selected':''}>${e(b.name)}</option>`).join('')}</select>${button('add-floor',icon('plus')+'Добавить этаж',state.office.buildings.length?'':'disabled')}${button('manage-buildings',icon('building')+'Корпусы','aria-label="Управление корпусами"')}${button('add-building',icon('plus')+'Добавить корпус')}${button('undo',icon('undo'),'aria-label="Отменить действие"','icon-btn')}</div></div><div class="empty"><h2>${state.office.buildings.length?'В корпусе пока нет этажей':'Пока нет корпусов'}</h2><p>${state.office.buildings.length?'Добавьте этаж, чтобы начать размещать зоны и рабочие места.':'Добавьте корпус, чтобы создать первый план офиса.'}</p></div>`;
   $('#empty-building').addEventListener('change',event=>{map.buildingId=event.target.value;changeFloor(state.office.floors.find(f=>f.buildingId===map.buildingId)?.id||'');});syncHistoryButtons();
 }
 function selection(){return map?.seatId?{kind:'seat',id:map.seatId}:map?.objectId?{kind:'object',id:map.objectId}:map?.roomId?{kind:'room',id:map.roomId}:null;}
@@ -159,6 +162,16 @@ function showAssignPerson(personId){
     map.floorId=f.id;map.buildingId=f.buildingId;map.camera=null;map.focusRoomId=r.id;selectState('seat',id);ui.closeModal();renderPage();ui.toast('Сотрудник добавлен на карту');
   });
 }
+function showBuildings(){
+  closeLayoutMenu();
+  ui.showModal('Корпусы',`<div class="building-list">${state.office.buildings.map(b=>{const floors=state.office.floors.filter(f=>f.buildingId===b.id),seats=floors.reduce((n,f)=>n+f.seats.length,0);return `<div class="building-row"><span class="building-row-icon">${icon('building')}</span><div><h3>${e(b.name)}</h3><p>Этажей: ${floors.length} · Рабочих мест: ${seats}</p></div>${button('delete-building',icon('trash'),`data-id="${b.id}" aria-label="Удалить корпус ${e(b.name)}" title="Удалить корпус"`,'icon-btn danger')}</div>`;}).join('')||'<p class="field-help">Корпусов пока нет. Создайте первый план офиса.</p>'}</div><div class="modal-footer">${button('cancel','Закрыть')}${button('add-building',icon('plus')+'Добавить корпус','','btn btn-primary')}</div>`);
+}
+function showDeleteBuilding(id){
+  const building=state.office.buildings.find(b=>b.id===id);if(!building)return;
+  const floors=state.office.floors.filter(f=>f.buildingId===id),seats=floors.reduce((n,f)=>n+f.seats.length,0);
+  ui.showModal('Удалить корпус?',`<form id="layout-delete-building"><p class="field-help">Корпус «${e(building.name)}»: этажей — ${floors.length}, рабочих мест — ${seats}. Все планы и объекты этого корпуса будут удалены. Сотрудники останутся в справочнике без назначения на удалённые места. Остальные корпусы не изменятся. Вернуть удалённое можно через Ctrl Z.</p>${actions('Удалить корпус')}</form>`);
+  bindForm('#layout-delete-building',async()=>{await commit(s=>deleteBuilding(s.office,id));if(!floor()){const next=state.office.floors[0];map.floorId=next?.id||'';map.buildingId=next?.buildingId||state.office.buildings[0]?.id||'';map.roomId='';map.seatId='';map.objectId='';map.focusRoomId='';map.camera=null;}ui.closeModal();renderPage();ui.toast('Корпус удалён · Ctrl Z — вернуть');});
+}
 function showBuildingForm(){
   ui.showModal('Добавить корпус',`<form id="layout-building-form">${input('building-name','Название корпуса','','text','required maxlength="100" placeholder="Например: Южный корпус"')}${actions('Создать план')}</form>`);
   bindForm('#layout-building-form',async()=>{let result;await commit(s=>result=createBuilding(s.office,$('#building-name').value));map.buildingId=result.buildingId;map.floorId=result.floorId;map.camera=null;map.focusRoomId='';selectState('floor',result.floorId);ui.closeModal();renderPage();});
@@ -176,6 +189,7 @@ function showObjectForm(id,kind='door',roomId){
 }
 function showFloorSize(){closeLayoutMenu();const f=floor();ui.showModal('Размер плана',`<form id="layout-size-form"><p class="field-help">Тяните за любой край или угол плана. Здесь можно указать точные размеры.</p><div class="office-form-grid">${input('floor-width','Ширина плана',f.width,'number','min="400" max="6000" required')}${input('floor-height','Высота плана',f.height,'number','min="350" max="6000" required')}</div>${actions()}</form>`);bindForm('#layout-size-form',async()=>{await commit(s=>resizeFloor(s.office.floors.find(f=>f.id===map.floorId),Number($('#floor-width').value),Number($('#floor-height').value)));map.focusRoomId='';map.camera=null;ui.closeModal();renderPage();});}
 function showFloorForm(){
+  if(!state.office.buildings.length){showBuildingForm();return;}
   const buildingId=map.buildingId||state.office.buildings[0].id,number=Math.max(0,...state.office.floors.filter(f=>f.buildingId===buildingId).map(f=>f.number))+1;
   ui.showModal('Добавить этаж',`<form id="layout-floor-form">${input('floor-number','Номер этажа',number,'number','min="1" max="200" required')}${input('floor-name','Название',number+'-й этаж','text','required maxlength="100"')}${actions('Добавить этаж')}</form>`);
   bindForm('#layout-floor-form',async()=>{const number=Number($('#floor-number').value),name=$('#floor-name').value.trim(),id=crypto.randomUUID();if(!name||!Number.isInteger(number)||number<1||number>200)throw new Error('Укажите название и номер этажа от 1 до 200.');await commit(s=>{if(s.office.floors.some(f=>f.buildingId===buildingId&&f.number===number))throw new Error('Такой этаж в корпусе уже есть.');s.office.floors.push({id,buildingId,number,name,width:1000,height:680,rooms:[],seats:[],objects:[]});});map.floorId=id;map.focusRoomId='';selectState('floor',id);map.camera=null;ui.closeModal();renderPage();});
@@ -194,7 +208,7 @@ function openContext(kind,id,point,anchor){
   const item=(action,label,attrs='',danger=false)=>button(action,label,`role="menuitem" tabindex="-1" ${attrs}`,'context-menu-item'+(danger?' danger':''));
   const seat=kind==='seat'?floor().seats.find(s=>s.id===id):null;
   menu.innerHTML=`<div class="context-menu-heading">${e(name)}</div>${kind==='floor'?item('add-room',`${icon('plus')}Добавить зону`)+item('resize-floor',`${icon('expand')}Размер плана`):item(kind==='room'?'edit-room':kind==='seat'?'edit-seat':'edit-object',`${icon('edit')}Изменить ${kind==='room'?'зону':kind==='seat'?'место':'объект'}`,`data-id="${id}"`)}${kind==='room'?item('add-object',`${icon('plus')}Добавить объект`,`data-room="${id}"`)+item('add-seat',`${icon('monitor')}Добавить место`,`data-room="${id}"`):''}${kind!=='floor'?item('rotate',`${icon('rotate')}Повернуть на 90°`,`data-kind="${kind}" data-id="${id}"`)+item('copy',`${icon('clipboard')}Копировать · Ctrl C`,`data-kind="${kind}" data-id="${id}"`):item('delete-floor',`${icon('trash')}Удалить этаж`,'',true)}${mapClipboard?item('paste',`${icon('clipboard')}Вставить · Ctrl V`):''}${seat?.personId?item('person-note',`${icon('clipboard')}Заметка сотрудника`,`data-person="${seat.personId}"`):''}${kind!=='floor'?`<div class="context-menu-divider"></div>${item('delete',`${icon('trash')}${kind==='room'?'Удалить зону с содержимым':kind==='seat'?'Удалить рабочее место':'Удалить объект'}`,`data-kind="${kind}" data-id="${id}"`,true)}`:''}`;
-  document.body.append(menu);const rect=menu.getBoundingClientRect(),bottom=matchMedia('(max-width:760px)').matches?80:10;menu.style.left=Math.max(10,Math.min(point.x,innerWidth-rect.width-10))+'px';menu.style.top=Math.max(10,Math.min(point.y,innerHeight-rect.height-bottom))+'px';menu.querySelector('[role=menuitem]')?.focus({preventScroll:true});
+  (document.fullscreenElement||$('#map-fullscreen-root')||document.body).append(menu);const rect=menu.getBoundingClientRect(),bottom=matchMedia('(max-width:760px)').matches?80:10;menu.style.left=Math.max(10,Math.min(point.x,innerWidth-rect.width-10))+'px';menu.style.top=Math.max(10,Math.min(point.y,innerHeight-rect.height-bottom))+'px';menu.querySelector('[role=menuitem]')?.focus({preventScroll:true});
 }
 async function act(el){
   const {layout:action,id,kind,room,person:personId}=el.dataset;
@@ -213,6 +227,8 @@ async function act(el){
     case 'resize-floor':showFloorSize();break;
     case 'add-floor':showFloorForm();break;
     case 'add-building':showBuildingForm();break;
+    case 'manage-buildings':showBuildings();break;
+    case 'delete-building':showDeleteBuilding(el.dataset.id);break;
     case 'rotate':await rotateObject(kind,id);break;
     case 'copy':copySelection(kind,id);break;
     case 'paste':await pasteSelection();break;
@@ -274,12 +290,29 @@ document.addEventListener('keydown',event=>{
   commit(s=>{const f=s.office.floors.find(f=>f.id===map.floorId);if(kind==='seat'){const item=f.seats.find(o=>o.id===id);moveSeat(f,id,item.x+dx,item.y+dy,{snap:1});}else if(kind==='object'){const item=f.objects.find(o=>o.id===id);moveObject(f,id,item.x+dx,item.y+dy,{snap:1});}else if(kind==='room'){const item=f.rooms.find(o=>o.id===id);saveRoom(f,{...item,x:item.x+dx,y:item.y+dy});}}).then(()=>{selectState(kind,id);draw();refreshLayoutDetails();document.querySelector(`#office-svg [data-map-kind="${kind}"][data-map-id="${id}"]`)?.focus({preventScroll:true});status('Положение сохранено');}).catch(errorMessage);
 });
 
+// Only this opaque root enters browser fullscreen. Site chrome stays outside,
+// while forms and popovers remain children of the active fullscreen element.
+function syncFullscreenHost(){
+  let root=$('#map-fullscreen-root');if(!root){root=document.createElement('div');root.id='map-fullscreen-root';root.setAttribute('role','region');root.setAttribute('aria-label','Полноэкранная карта офиса');document.body.append(root);}
+  const panel=$('#main-content .office-plan-panel');if(panel)root.prepend(panel);
+  const overlay=$('#overlay-root');if(overlay&&overlay.parentElement!==root)root.append(overlay);
+  return root;
+}
+function restoreFullscreenHost(){
+  const root=$('#map-fullscreen-root');if(!root)return;
+  const panel=root.querySelector('.office-plan-panel'),layout=$('#main-content .office-layout');if(panel&&layout)layout.prepend(panel);
+  const overlay=root.querySelector('#overlay-root');if(overlay)document.body.append(overlay);root.remove();
+}
+function releaseMapFullscreen(){
+  const root=$('#map-fullscreen-root');if(root&&document.fullscreenElement===root)document.exitFullscreen?.().catch(()=>{});
+  if(map){map.expanded=false;map.nativeFullscreen=false;}document.body.classList.remove('map-expanded');restoreFullscreenHost();
+}
 async function toggleMapFullscreen(){
   if(!active||!floor())return;
-  if(map.expanded){map.expanded=false;document.body.classList.remove('map-expanded');if(map.nativeFullscreen&&document.fullscreenElement)await document.exitFullscreen().catch(()=>{});map.nativeFullscreen=false;}
-  else{map.expanded=true;document.body.classList.add('map-expanded');if(!document.fullscreenElement&&document.documentElement.requestFullscreen)try{await document.documentElement.requestFullscreen();map.nativeFullscreen=true;}catch{}}
+  if(map.expanded){map.expanded=false;map.nativeFullscreen=false;if(document.fullscreenElement===$('#map-fullscreen-root'))await document.exitFullscreen().catch(()=>{});document.body.classList.remove('map-expanded');restoreFullscreenHost();}
+  else{map.expanded=true;document.body.classList.add('map-expanded');const root=syncFullscreenHost();if(!document.fullscreenElement&&root.requestFullscreen)try{await root.requestFullscreen();map.nativeFullscreen=true;}catch{}}
   updateFullscreenButton();requestAnimationFrame(applyCamera);
 }
 function updateFullscreenButton(){const button=$('[data-layout="fullscreen"]');if(!button||!map)return;const label=map.expanded?'Выйти из полноэкранного режима':'Карта на весь экран';button.setAttribute('aria-label',label);button.setAttribute('aria-pressed',String(!!map.expanded));button.title=map.expanded?'Выйти · Esc':label;}
-document.addEventListener('fullscreenchange',()=>{if(active&&map?.nativeFullscreen&&!document.fullscreenElement){map.expanded=false;map.nativeFullscreen=false;document.body.classList.remove('map-expanded');updateFullscreenButton();requestAnimationFrame(applyCamera);}});
+document.addEventListener('fullscreenchange',()=>{if(active&&map?.nativeFullscreen&&!document.fullscreenElement){map.expanded=false;map.nativeFullscreen=false;document.body.classList.remove('map-expanded');restoreFullscreenHost();updateFullscreenButton();requestAnimationFrame(applyCamera);}});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&active&&map?.expanded&&!$('.modal')&&!$('#layout-context-menu')&&!$('.custom-select-popover')){event.preventDefault();toggleMapFullscreen().catch(errorMessage);}});
