@@ -1,14 +1,37 @@
 name: compass
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4180
+      COMPASS_PUBLIC_URL: ${COMPASS_PUBLIC_URL:-https://compass.vlassadassa.ru}
+      COMPASS_DATABASE_URL: postgresql://${POSTGRES_USER:-compass}:${POSTGRES_PASSWORD:?Run bash scripts/setup-docker.sh first}@postgres:5432/${POSTGRES_DB:-compass}
+      COMPASS_DB_SSL: "false"
+      COMPASS_SECRET: ${COMPASS_SECRET:?Run bash scripts/setup-docker.sh first}
+      COMPASS_AUTH_USER: ${COMPASS_AUTH_USER:-admin}
+      COMPASS_AUTH_PASSWORD: ${COMPASS_AUTH_PASSWORD:?Run bash scripts/setup-docker.sh first}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${COMPASS_APP_PORT:-4180}:4180"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-compass}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup:vps first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run bash scripts/setup-docker.sh first}
       POSTGRES_DB: ${POSTGRES_DB:-compass}
-    ports:
-      - "127.0.0.1:${COMPASS_POSTGRES_PORT:-55432}:5432"
     volumes:
       - compass-postgres-data:/var/lib/postgresql/data
     healthcheck:

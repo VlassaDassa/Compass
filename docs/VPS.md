@@ -1,79 +1,59 @@
-# Compass на compass.vlassadassa.ru
+# Compass на VPS с Docker
 
-Схема: Caddy → `127.0.0.1:4180` → Node.js → PostgreSQL `127.0.0.1:55432`.
-Проект: `/srv/compass/repo`. Остальные сайты, их порты и блоки Caddy не меняются.
-Нужны Node.js 22+, Docker с `docker compose`, Git и уже установленный Caddy.
+Схема как у портфолио: Caddy → `127.0.0.1:4180` → контейнер приложения → PostgreSQL в отдельном контейнере. Проект: `/srv/compass/repo`. Порт PostgreSQL наружу не публикуется. Node.js и npm на VPS устанавливать не нужно: приложение собирается внутри Docker.
 
-## 1. Скачать исходники
+## Перед началом
 
-Выполняйте на VPS от `deploy`:
+Нужны Git, Docker, Docker Compose, openssl и Caddy. Проверьте `docker --version`, `docker compose version`, `docker info` и `openssl version`. Если Docker требует sudo, используйте `sudo docker compose` вместо `docker compose` во всех командах; не предоставляйте доступ к Docker другим пользователям без понимания рисков. Убедитесь, что порт 4180 свободен: `sudo ss -ltnp | grep ':4180'`. Если он занят, остановитесь и выберите другой порт через `COMPASS_APP_PORT` и Caddy.
+
+Если `/srv/compass/repo` уже существует, не клонируйте и не удаляйте его. Проверьте владельца и изменения, затем обновите ветку:
+
+```bash
+cd /srv/compass/repo
+git status --short --branch
+git pull --ff-only origin work
+```
+
+При ошибке или наличии локальных изменений сначала разберитесь с ними; не используйте `git reset --hard`. Для новой установки:
 
 ```bash
 sudo install -d -o deploy -g deploy /srv/compass
 git clone --branch work https://github.com/VlassaDassa/Compass.git /srv/compass/repo
 cd /srv/compass/repo
-npm ci
-npm run build
-npm run setup:vps
+```
+
+Если ранее запускали Compass через systemd, проверьте `sudo systemctl status compass`; не запускайте второй экземпляр на том же порту. Не останавливайте другие проекты.
+
+## Настройка и запуск
+
+```bash
+bash scripts/setup-docker.sh
 nano .env
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=80 app
 ```
 
-Запишите `COMPASS_AUTH_USER` и `COMPASS_AUTH_PASSWORD`: это вход владельца через
-браузер. Генератор не выводит секреты и никогда не перезаписывает существующий
-`.env`. Если `.env` уже был создан раньше, сверьте его с `.env.example` и добавьте
-недостающие параметры. Никогда не отправляйте `.env` в GitHub.
+Скрипт создаёт `.env` со случайными паролями, только если файла нет. Запишите `COMPASS_AUTH_USER` и `COMPASS_AUTH_PASSWORD` для входа; файл никому не отправляйте. Сохраните защищённую копию `.env`: `COMPASS_SECRET` нужен для расшифровки ключа ИИ. Пароль PostgreSQL генерируется в hex; при ручной замене используйте безопасные URL символы. При уже существующей БД замена пароля в `.env` не меняет пароль её пользователя. Не удаляйте том для исправления настройки.
 
-Убедитесь, что `4180` и `55432` свободны (`sudo ss -ltnp`). При необходимости
-выберите другие свободные порты. Порт приложения должен совпадать в `.env` и
-блоке Caddy; порт БД — в `COMPASS_POSTGRES_PORT` и `COMPASS_DATABASE_URL`.
+В `.env` от старого запуска могут оставаться `HOST`, `PORT`, `COMPASS_DATABASE_URL`: Docker Compose задаёт приложению отдельные внутренние значения и подключается к `postgres:5432`; прежние секреты и данные тома сохраняются. Если `.env` уже существует, убедитесь, что `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD`, `COMPASS_SECRET`, `COMPASS_AUTH_USER` и `COMPASS_AUTH_PASSWORD` заполнены.
 
-## 2. Подключить PostgreSQL
+Проверка (подставьте другой логин вместо admin при необходимости):
 
 ```bash
-docker compose up -d --wait postgres
-docker compose exec postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-```
-
-Compose создаёт отдельную БД и постоянный Docker volume. БД доступна только
-через loopback VPS. `COMPASS_DATABASE_URL` из `.env` связывает Node.js с БД;
-пароль в URL должен совпадать с `POSTGRES_PASSWORD`.
-
-Таблицы из `docs/runtime-schema.sql` создаются сервером автоматически. Все статьи,
-изображения в статьях, версии, сотрудники, корпуса, этажи, места, ссылки, заметки,
-хранилище и настройки сохраняются в JSONB рабочего пространства. Ключи ИИ лежат
-отдельно с AES-GCM-шифрованием. JSONB — текущая рабочая схема; `docs/schema.sql`
-описывает возможное дальнейшее разбиение по сущностям, применять её не нужно.
-
-Для уже установленного PostgreSQL Compose не требуется: создайте отдельного
-пользователя и базу, задайте их URL в `.env`. Для внешней БД с проверяемым
-сертификатом используйте `COMPASS_DB_SSL=true`. Не отключайте проверку TLS.
-
-Существующие данные Docker volume не меняют пароль от редактирования `.env`.
-Для смены пароля используйте `ALTER ROLE` в БД и обновите `.env`. Не удаляйте volume.
-
-## 3. Запустить Compass как службу
-
-```bash
-sudo install -m 0644 deploy/compass.service /etc/systemd/system/compass.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now compass
-sudo systemctl status compass --no-pager
-journalctl -u compass -n 50 --no-pager
 curl -u admin http://127.0.0.1:4180/api/health
 ```
 
-`curl` спросит пароль. Нормальный ответ: `database: connected`, `persistence: true`.
-Если пользователь или путь отличаются, исправьте `User`, `Group`,
-`WorkingDirectory` и `EnvironmentFile` в unit-файле до установки.
-Приложение в production не запускается без БД, `COMPASS_SECRET` и пароля входа.
-При недоступности БД интерфейс сообщает об ошибке, а не переключается незаметно
-на другое хранилище. Параллельные записи защищены проверкой версии.
+Введите пароль при запросе. Ответ должен содержать `database: connected` и `persistence: true`. База запускается первой и сервер автоматически создаёт рабочие таблицы. Если база не отвечает, используйте `docker compose logs --tail=80 postgres` и `docker compose logs --tail=80 app`. Не публикуйте журналы с секретами.
 
-## 4. Добавить поддомен в Caddy
+## Caddy и HTTPS
 
-Проверьте A/AAAA-записи `compass.vlassadassa.ru`: они должны вести на этот VPS.
-Сохраните копию текущего Caddyfile и добавьте **только новый блок**, не заменяя
-существующие сайты:
+Проверьте, что DNS `compass.vlassadassa.ru` указывает на VPS и доступны порты 80 и 443. Сохраните копию конфигурации и добавьте новый блок, не меняя остальные сайты:
+
+```bash
+sudo cp -n /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-compass
+sudo nano /etc/caddy/Caddyfile
+```
 
 ```caddyfile
 compass.vlassadassa.ru {
@@ -83,66 +63,33 @@ compass.vlassadassa.ru {
 ```
 
 ```bash
-sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-compass
-sudo nano /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
+sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
 ```
 
-Откройте `https://compass.vlassadassa.ru`, введите логин и пароль из `.env`.
-Caddy сам выдаст HTTPS-сертификат. Приложение и БД не нужно открывать в firewall.
-Сейчас это закрытое рабочее пространство владельца с одним серверным логином;
-карточки сотрудников и роли в справочнике не создают отдельные пароли входа.
+Откройте https://compass.vlassadassa.ru и войдите с данными из `.env`. Это пока единый общий логин: отдельная авторизация и разделение ролей не реализованы. Не храните настоящие пароли и конфиденциальные данные до доработки безопасности.
 
-## 5. Перенести данные из текущего сайта
+## Перенос и резервные копии
 
-На старом Compass откройте **Настройки → Общее → Перенос рабочего пространства**,
-скачайте файл `.compass`. На VPS в том же разделе импортируйте файл. Перед заменой
-данных интерфейс покажет подтверждение. Перенесутся также корпуса, назначения,
-заметки и секреты. Файл содержит секреты в открытом виде: удалите его после переноса
-и не публикуйте. Обычный JSON-экспорт без секретов остаётся отдельной функцией.
-
-## Обновления и резервные копии
+На старом сайте экспортируйте файл в «Настройки → Общее → Перенос рабочего пространства», затем импортируйте на новом. Импорт заменяет текущее пространство: сначала сделайте копию нового. Файл может содержать секреты в открытом виде; обращайтесь с ним как с конфиденциальным.
 
 ```bash
 cd /srv/compass/repo
 bash scripts/backup.sh
-git pull --ff-only origin work
-npm ci
-npm run build
-sudo systemctl restart compass
 ```
 
-Копии БД: `/srv/compass/backups/`. Отдельно сохраните `.env` в защищённом месте:
-потеря `COMPASS_SECRET` делает ранее сохранённые ключи ИИ нечитаемыми.
-Для восстановления в нужную базу (заменяет её содержимое; сначала сделайте копию):
+Копии находятся в `/srv/compass/backups/`; защищённую копию храните также вне VPS вместе с `.env`. Восстановление заменяет данные, поэтому сначала сделайте новую копию и проверьте целевую базу. Не выполняйте `docker compose down -v`: это удалит том PostgreSQL. После остановки обычной командой `docker compose stop` данные сохраняются.
+
+## Обновление
 
 ```bash
-gzip -dc /srv/compass/backups/ИМЯ_КОПИИ.sql.gz | docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+cd /srv/compass/repo
+bash scripts/backup.sh
+git status --short --branch
+git pull --ff-only origin work
+docker compose up -d --build
+docker compose ps
 ```
 
-Не используйте `docker compose down -v`: это удаляет данные PostgreSQL.
-Остановка без удаления данных: `sudo systemctl stop compass` и `docker compose stop`.
+## ИИ
 
-## Подключение ИИ
-
-Настройка провайдера работает на серверной версии с PostgreSQL; статическая
-версия Sites не предоставляет серверный API ИИ. Откройте Compass на VPS под
-серверным логином и перейдите в **Настройки → ИИ-помощник**.
-
-Для GigaChat зарегистрируйте приложение в кабинете разработчика GigaChat и
-получите авторизационные данные для API. Выберите GigaChat, укажите модель
-`GigaChat-2-Max` и URL `https://gigachat.devices.sberbank.ru/api/v1`, затем
-вставьте в поле API-ключ значение Authorization Key, выданное кабинетом для
-OAuth Basic (не короткоживущий access token). Сохраните и задайте вопрос в
-разделе «ИИ-помощник». Для GigaChat в коде используется scope `GIGACHAT_API_PERS`;
-учётные данные другого типа могут потребовать изменения настройки scope.
-Если TLS-проверка отклоняет сертификат GigaChat, установите доверенный корневой
-сертификат по официальной инструкции провайдера; не отключайте проверку TLS.
-
-Для совместимого сервиса выберите OpenAI-compatible или «Свой», задайте URL API,
-имя модели и ключ этого провайдера. Ключ сохраняется зашифрованным в PostgreSQL;
-пустое поле при сохранении оставляет прежний ключ, поэтому при смене провайдера
-введите новый явно. Проверьте текущие тарифы и доступность у поставщика.
-Сейчас сайт использует один общий серверный логин, поэтому разделение прав на
-настройку ИИ между отдельными сотрудниками ещё не реализовано.
+В серверной версии откройте «Настройки → ИИ-помощник». Для GigaChat зарегистрируйтесь у провайдера, получите OAuth Authorization Key для `GIGACHAT_API_PERS`, выберите GigaChat, укажите доступную модель (например `GigaChat-2-Max`) и `https://gigachat.devices.sberbank.ru/api/v1`, вставьте ключ и сохраните. Проверьте текущие тарифы и доступность модели у провайдера. Вопрос и найденные фрагменты статей отправляются внешнему сервису. Для другого OpenAI-compatible провайдера укажите его URL, модель и новый ключ. Ключ шифруется через `COMPASS_SECRET`. С текущим общим входом любой его владелец может поменять провайдера; полноценного разделения прав пока нет. При проблемах TLS установите доверенный сертификат по официальной инструкции провайдера; не отключайте проверку сертификата.
