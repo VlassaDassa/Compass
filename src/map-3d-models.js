@@ -2,7 +2,7 @@ import * as T from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {wallSegments} from '../dist/map-walls.js';
 
-const colors={wood:0xb98c63,woodEdge:0x805f4a,metal:0x8693aa,dark:0x242737,screen:0x72c8de,ivory:0xd0d4de,fabric:0x6674a4,leaf:0x648f77,pot:0x9c7063,gold:0xbca2ed,glass:0x7aa4ca};
+const colors={wood:0x96989c,woodEdge:0x62646a,metal:0x8b8e95,dark:0x24262b,screen:0x9daab0,ivory:0xd0d2d6,fabric:0x676b74,leaf:0x78867b,pot:0x747178,gold:0xbcbfc6,glass:0x98a5ad};
 const materials=Object.fromEntries(Object.entries(colors).map(([key,color])=>[key,new T.MeshStandardMaterial({color,roughness:key==='metal'?.48:.76,metalness:key==='metal'?.28:0,emissive:key==='screen'?0x265267:0,emissiveIntensity:.35})]));
 const geometries=new Map();
 function box(g,x,y,z,w,d,h,material='metal',radius=0){
@@ -102,17 +102,17 @@ export function createFurniture(kind,width,height,rotation=0){
   return pivot;
 }
 
-export function createPlatform(width,height,depth,topColor,sideColor){
+export function createPlatform(width,height,depth,topColor,sideColor,borderColor=0x81729e){
   const top=new T.MeshStandardMaterial({color:topColor,roughness:.94}),side=new T.MeshStandardMaterial({color:sideColor,roughness:.8});
   const geometry=new T.BoxGeometry(width,height,depth),mesh=new T.Mesh(geometry,[side,side,side,side,top,side]);
   mesh.position.set(width/2,height/2,-depth/2);
   const group=new T.Group();group.add(mesh);
-  const border=new T.LineSegments(new T.EdgesGeometry(geometry),new T.LineBasicMaterial({color:0x81729e,transparent:true,opacity:.38}));border.position.copy(mesh.position);group.add(border);return group;
+  const border=new T.LineSegments(new T.EdgesGeometry(geometry),new T.LineBasicMaterial({color:borderColor,transparent:true,opacity:.38}));border.position.copy(mesh.position);group.add(border);return group;
 }
 
-export function createZoneWalls(room,rooms,objects=[]){
+export function createZoneWalls(room,rooms,objects=[],wallColor=0x746b86){
   const group=new T.Group();if(room.open)return group;
-  const thickness=4,segments=wallSegments(room,rooms,objects),material=new T.MeshStandardMaterial({color:0x746b86,roughness:.82});
+  const thickness=4,segments=wallSegments(room,rooms,objects),material=new T.MeshStandardMaterial({color:wallColor,roughness:.82});
   for(const [side,parts]of Object.entries(segments))for(const [a,b]of parts){
     // The front boundary stays low so it never hides desks or chairs.
     const horizontal=side==='n'||side==='s',height=side==='n'||side==='w'?24:13;

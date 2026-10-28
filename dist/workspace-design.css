@@ -76,3 +76,8 @@ html[data-motion=false] .ambient-background:before{animation:none}.appearance-co
 .office-viewport.isometric :is(.caption-plate,.caption-room .caption-plate,.caption-marker .caption-plate,.caption-building .caption-plate,.caption-missing .caption-plate){fill:var(--paper);stroke:var(--line)}
 .office-viewport.isometric :is(.caption-text,.caption-room .caption-text,.caption-marker .caption-text,.caption-building .caption-text){fill:var(--ink)}.office-viewport.isometric .caption-missing .caption-text{fill:var(--muted)}
 #appearance-reset{background:#1b1c20!important;border-color:#62646d!important}
+/* A single focus boundary around composite search controls. */
+.search-field input:focus,.search-field input:focus-visible,.global-search-field input:focus,.global-search-field input:focus-visible{outline:none;box-shadow:none;border-color:transparent}
+.search-field:focus-within,.global-search-field:focus-within{border-color:var(--accent);box-shadow:none}
+/* Fine grain covers surfaces as well as the background without intercepting input. */
+body:before{content:"";position:fixed;inset:0;z-index:1100;pointer-events:none;opacity:calc(var(--grain-opacity,.08) * .45);mix-blend-mode:soft-light;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='surface-grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23surface-grain)'/%3E%3C/svg%3E")}
