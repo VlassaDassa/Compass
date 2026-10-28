@@ -107,3 +107,6 @@ html[data-motion=false] :is(.topic-card,.guide-card,.person-card,.resource-card,
 @media(max-width:760px){.topbar{margin:8px 10px 0;top:8px;border-radius:12px}.map-workspace .content{height:auto}}
 /* Main content is a programmatic skip-link target, not an interactive control. */
 #main-content:focus-visible{outline:none}
+/* The SVG fallback follows the same independent map palette as WebGL. */
+.office-viewport.isometric .map-floor-fill{fill:var(--map-base,#151619)}
+.office-viewport.isometric .office-room.map-zone>.office-room-bg,.office-viewport.isometric .office-room.map-zone.open-zone>.office-room-bg{fill:var(--map-zone,#303139)}
