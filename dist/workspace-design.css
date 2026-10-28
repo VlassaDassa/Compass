@@ -110,3 +110,5 @@ html[data-motion=false] :is(.topic-card,.guide-card,.person-card,.resource-card,
 /* The SVG fallback follows the same independent map palette as WebGL. */
 .office-viewport.isometric .map-floor-fill{fill:var(--map-base,#151619)}
 .office-viewport.isometric .office-room.map-zone>.office-room-bg,.office-viewport.isometric .office-room.map-zone.open-zone>.office-room-bg{fill:var(--map-zone,#303139)}
+/* Keep the whole card a native link without covering its bookmark control. */
+.guide-card{position:relative;cursor:pointer}.guide-card-link:after{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit}.guide-card-top .icon-btn{position:relative;z-index:2}.guide-card-bottom{gap:10px;flex-wrap:wrap}.guide-card-bottom .flex{gap:5px}
