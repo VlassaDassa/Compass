@@ -2,7 +2,7 @@ import * as T from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {wallSegments} from '../dist/map-walls.js';
 
-const colors={wood:0x96989c,woodEdge:0x62646a,metal:0x8b8e95,dark:0x24262b,screen:0x9daab0,ivory:0xd0d2d6,fabric:0x676b74,leaf:0x78867b,pot:0x747178,gold:0xbcbfc6,glass:0x98a5ad};
+const colors={wood:0xad896b,woodEdge:0x765b4c,metal:0x8b9098,dark:0x292c32,screen:0x86aeb9,ivory:0xd0d2d3,fabric:0x687a89,leaf:0x6d896f,pot:0x96766b,gold:0xb1a48c,glass:0x90abb5};
 const materials=Object.fromEntries(Object.entries(colors).map(([key,color])=>[key,new T.MeshStandardMaterial({color,roughness:key==='metal'?.48:.76,metalness:key==='metal'?.28:0,emissive:key==='screen'?0x265267:0,emissiveIntensity:.35})]));
 const geometries=new Map();
 function box(g,x,y,z,w,d,h,material='metal',radius=0){
