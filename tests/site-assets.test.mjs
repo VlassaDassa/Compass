@@ -10,4 +10,5 @@ test('published HTML uses fingerprinted CSS and a bundled, fingerprinted module 
   const links=[...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)];assert.ok(links.length>=10);
   for(const[,asset]of links){const match=asset.match(/^\/assets\/([a-z-]+)-([a-f0-9]{12})\.css$/);assert.ok(match,asset);const output=await readFile(new URL('../dist'+asset,import.meta.url)),source=await readFile(new URL('../dist/'+match[1]+'.css',import.meta.url));assert.deepEqual(output,source);assert.equal(createHash('sha256').update(output).digest('hex').slice(0,12),match[2]);}
   const entry=html.match(/<script type="module" src="([^"]+)"/)[1],code=await readFile(new URL('../dist'+entry,import.meta.url),'utf8');assert.ok(!code.includes('from"./appearance.js"'));assert.ok(!code.includes('from"./store.js"'));
+  const map=code.match(/\/map-3d\.js\?v=([a-f0-9]{12})/);assert.ok(map,'map module has a content-addressed URL');const mapBytes=await readFile(new URL('../dist/map-3d.js',import.meta.url));assert.equal(createHash('sha256').update(mapBytes).digest('hex').slice(0,12),map[1]);
 });

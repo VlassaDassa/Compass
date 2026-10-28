@@ -11,7 +11,9 @@ await copyFile('node_modules/@fontsource-variable/golos-text/LICENSE','dist/font
 await copyFile('node_modules/three/LICENSE','dist/THREE-LICENSE.txt');
 // Content-address the complete browser module graph, not just the HTML URL.
 // Keep prior assets available so already-open tabs can finish loading chunks.
-const app=await build({entryPoints:['dist/app.js'],bundle:true,splitting:true,format:'esm',minify:true,outdir:'dist/assets',entryNames:'app-[hash]',chunkNames:'chunk-[hash]',target:['es2022'],legalComments:'none',metafile:true});
+// Keep the already bundled Three.js map as a separately cached module.
+const mapHash=createHash('sha256').update(await readFile('dist/map-3d.js')).digest('hex').slice(0,12);
+const app=await build({entryPoints:['dist/app.js'],bundle:true,splitting:true,format:'esm',minify:true,outdir:'dist/assets',entryNames:'app-[hash]',chunkNames:'chunk-[hash]',target:['es2022'],legalComments:'none',metafile:true,plugins:[{name:'external-map-bundle',setup(build){build.onResolve({filter:/^\.\/map-3d\.js$/},()=>({path:`/map-3d.js?v=${mapHash}`,external:true}));}}]});
 const entry=Object.entries(app.metafile.outputs).find(([,value])=>value.entryPoint==='dist/app.js')?.[0];
 if(!entry)throw new Error('Browser entrypoint was not generated.');
 let html=await readFile('dist/index.html','utf8');

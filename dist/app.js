@@ -7,6 +7,7 @@ import {mountVault,disposeVault,resolveVaultValue} from './vault.js';
 import {mountMap,mountPeople,disposeOffice,hideOfficeSecrets} from './office.js';
 import {initialize,state,update,persistent,serverBacked,storageLabel,searchArticles,similarArticles,sanitize,textContent,exportData} from './store.js';
 import {articleViews,incrementArticleView} from './article-views.js';
+import {mountAssistant,requestEditorDraft} from './ai-chat.js';
 
 const icons={
  expand:'<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M4 4l6 6m4 4 6 6M20 4l-6 6M10 14l-6 6"/>',
@@ -104,11 +105,7 @@ function renderResources(){
 function renderGlossary(){
  $('#main-content').innerHTML=`${titleRow('Знакомые слова. Новый контекст.','Коротко о том, как устроена корпоративная IT-среда.',false)}<div class="panel">${glossary.map(([word,description,id])=>`<article class="glossary-card"><h3>${word}</h3><p>${description}</p><a href="#/article/${id}" class="text-link">Подробнее в инструкции ${icon('arrow')}</a></article>`).join('')}</div>${footer()}`;
 }
-function renderAssistant(){
- $('#main-content').innerHTML=`<div class="ai-wrap"><div class="between"><span class="badge purple">${icon('sparkles')}ИИ-помощник</span><a href="#/settings?tab=ai" class="text-link">${icon('settings')}Настройки</a></div><section class="ai-empty"><div class="ai-symbol">${icon('sparkles')}</div><h1>Разберёмся вместе.</h1><p>Задайте вопрос своими словами. Помощник ответит по материалам базы и покажет, на какие статьи опирался.</p></section><div class="ai-suggestions">${['Как подготовить рабочее место?','Outlook не подключается','Принтер не печатает','Доступ к общей папке'].map(t=>`<button class="suggestion" data-action="suggest" data-query="${esc(t)}">${t}${icon('arrow')}</button>`).join('')}</div><form id="ai-form" class="ai-composer"><textarea id="ai-query" placeholder="Например: как подключить компьютер через телефон?" aria-label="Ваш вопрос" required></textarea><div class="ai-composer-bottom"><span class="flex gap8">${icon('shield')}Вопрос и найденные фрагменты статей отправляются провайдеру</span><button class="btn btn-primary" type="submit">Задать вопрос ${icon('arrow')}</button></div></form><div id="ai-results" class="ai-results"></div><div class="notice" style="margin-top:28px">${icon('info')}Для ответа настройте ИИ-провайдера. При ошибке доступен поиск по базе.</div></div>${footer()}`;
- $('#ai-form').addEventListener('submit',e=>{e.preventDefault();runAssistantSearch();});
-}
-async function runAssistantSearch(){const q=$('#ai-query').value.trim();if(!q)return;const terms=q.toLocaleLowerCase('ru').match(/[а-яёa-z0-9]{4,}/g)||[];const scored=published().map(a=>{const title=a.title.toLocaleLowerCase('ru');const all=(a.title+' '+a.summary+' '+textContent(a.body)).toLocaleLowerCase('ru');return{a,score:terms.reduce((s,t)=>s+(title.includes(t)?3:all.includes(t)?1:0),0)};}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,4).map(x=>x.a);const context=scored.map(a=>`Статья: ${a.title}\n${a.summary}\n${textContent(a.body).slice(0,1800)}`).join('\n\n');$('#ai-results').innerHTML=`<div class="ai-loading">${icon('sparkles')}Готовлю ответ…</div>`;try{const response=await fetch('/api/assistant/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,context})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Провайдер пока не настроен.');$('#ai-results').innerHTML=`<article class="ai-message"><div class="ai-message-heading">${icon('sparkles')}Ответ помощника</div><div class="prose">${esc(payload.text).replace(/\n/g,'<br>')}</div>${scored.length?`<div class="ai-sources"><strong>Источники</strong>${scored.map(a=>`<a href="#/article/${a.id}">${esc(a.title)} ${icon('arrow')}</a>`).join('')}</div>`:''}</article>`;}catch(error){$('#ai-results').innerHTML=`<h2>Материалы по вашему вопросу</h2><p class="tiny muted" style="margin-bottom:15px">${esc(error.message)} Ниже — локальный поиск по базе.</p>${scored.length?`<div class="article-list">${scored.map(articleRow).join('')}</div>`:emptyState('В базе пока нет ответа','Уточните запрос или добавьте новую инструкцию.','search','Создать статью','#/editor')}`;}}
+function renderAssistant(){mountAssistant({icon,esc,toast,showModal,closeModal,footer});}
 function renderSettings(){const tab=params.get('tab')||'general';
  $('#main-content').innerHTML=`${titleRow('Настроим под вашу команду.','Рабочее пространство, пользователи и будущие интеграции.',false)}<div class="settings-layout"><nav class="settings-menu">${[['general','settings','Общее'],['users','users','Пользователи'],['integrations','link','Интеграции'],['ai','sparkles','ИИ-помощник']].map(([id,i,label])=>`<a href="#/settings?tab=${id}" class="nav-link ${tab===id?'active':''}">${icon(i)}${label}</a>`).join('')}</nav><div class="settings-content" id="settings-content"></div></div>${footer()}`;
  const target=$('#settings-content');
@@ -141,6 +138,7 @@ async function renderEditor(){
  editorModule ||= await import('./editor.js');
  if(page!=='editor')return;
  editorInstance=editorModule.createEditor({element:$('#editor-body'),toolbar:$('#editor-toolbar'),content:sanitize(d.body),icon,onChange:editorChanged,onLink:showLinkDialog,onError:toast,onImageState:n=>{pendingImages+=n;const b=$('#publish-button');if(b)b.disabled=pendingImages>0;}});
+ $('#publish-button').insertAdjacentHTML('beforebegin',`<button class="btn btn-small" type="button" data-action="ai-draft">${icon('sparkles')}Оформить с ИИ</button>`);
  document.querySelectorAll('#editor-title,#editor-summary,#editor-tags,#editor-note,#editor-category,#editor-department,#editor-effective').forEach(el=>el.addEventListener('input',()=>{editorChanged();if(el.id==='editor-title')checkSimilar();}));
  updateWordCount();checkSimilar();
 }
@@ -228,7 +226,7 @@ document.addEventListener('click',e=>{
    case 'publish':await publish();break;
    case 'publish-anyway':await publish(true);break;
    case 'unlink':closeModal();editorInstance?.chain().focus().extendMarkRange('link').unsetLink().run();break;
-   case 'suggest':$('#ai-query').value=button.dataset.query;runAssistantSearch();$('#ai-query').focus();break;
+   case 'ai-draft':{const editor=editorInstance;requestEditorDraft({icon,esc,toast,showModal,closeModal},draft=>{if(editor!==editorInstance||page!=='editor'){toast('Редактор закрыт; черновик не применён.');return;}$('#editor-title').value=draft.title;$('#editor-summary').value=draft.summary;editor.commands.setContent(sanitize(draft.body));editorChanged();checkSimilar();toast('Черновик добавлен. Проверьте и отредактируйте его перед публикацией.');});break;}
    case 'provider':await update(s=>{s.settings.provider=id;});renderSettings();toast('Будущий режим сохранён. Провайдер ещё не подключён.');break;
    case 'add-user':showAddUser();break;
    case 'add-link':showAddLink();break;

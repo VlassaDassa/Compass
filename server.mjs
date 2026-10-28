@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { Pool } from 'pg';
+import {buildProviderMessages} from './dist/ai-prompts.js';
 const root = path.resolve(fileURLToPath(new URL('./dist/', import.meta.url)));
 const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.svg':'image/svg+xml', '.json':'application/json; charset=utf-8', '.woff2':'font/woff2' };
 const port = Number(process.env.PORT || 4173);
@@ -31,9 +32,9 @@ async function aiSettings(){if(!pool||databaseState!=='connected')return null;co
 const providerDefaults={gigachat:{model:'GigaChat-2-Max',baseUrl:'https://gigachat.devices.sberbank.ru/api/v1'},openai:{model:'deepseek-chat',baseUrl:'https://api.deepseek.com/v1'},custom:{model:'',baseUrl:''}};
 function providerConfig(input){const provider=['gigachat','openai','custom'].includes(input.provider)?input.provider:'gigachat';const defaults=providerDefaults[provider];return{provider,model:String(input.model||defaults.model).slice(0,120),baseUrl:String(input.baseUrl||defaults.baseUrl).replace(/\/$/,'').slice(0,500),apiKey:String(input.apiKey||'').slice(0,1000)};}
 async function gigachatToken(apiKey){const response=await fetch('https://ngw.devices.sberbank.ru:9443/api/v2/oauth',{method:'POST',headers:{Authorization:`Basic ${apiKey}`,RqUID:crypto.randomUUID(),'Content-Type':'application/x-www-form-urlencoded'},body:'scope=GIGACHAT_API_PERS'});if(!response.ok)throw new Error(`GigaChat OAuth: ${response.status}`);const data=await response.json();return data.access_token;}
-async function askProvider(config,question,context=''){
+async function askProvider(config,messages){
   const token=config.provider==='gigachat'?await gigachatToken(config.apiKey):config.apiKey;
-  const response=await fetch(`${config.baseUrl}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,messages:[{role:'system',content:'Ты помощник внутренней базы знаний IT-поддержки. Отвечай по-русски, коротко и практично. Используй только переданный контекст. Если контекста недостаточно, честно скажи об этом и предложи уточнить вопрос.'},{role:'user',content:`Контекст базы знаний:\n${context}\n\nВопрос пользователя:\n${question}`}],temperature:.2})});
+  const response=await fetch(`${config.baseUrl}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,messages,temperature:.2})});
   const text=await response.text();if(!response.ok)throw new Error(`${config.provider}: ${response.status} ${text.slice(0,300)}`);let data;try{data=JSON.parse(text);}catch{throw new Error('Провайдер вернул некорректный ответ');}return data.choices?.[0]?.message?.content||'Провайдер не вернул текст ответа.';
 }
 async function api(req,res,pathname){
@@ -63,8 +64,8 @@ async function api(req,res,pathname){
     await pool.query('INSERT INTO compass_ai_settings(workspace_id,provider,model,base_url,api_key_cipher) VALUES($1,$2,$3,$4,$5) ON CONFLICT(workspace_id) DO UPDATE SET provider=EXCLUDED.provider,model=EXCLUDED.model,base_url=EXCLUDED.base_url,api_key_cipher=EXCLUDED.api_key_cipher,updated_at=now()',['default',config.provider,config.model,config.baseUrl,encrypt(config.apiKey)]);return json(res,200,{provider:config.provider,model:config.model,baseUrl:config.baseUrl,configured:true});
   }
   if(pathname==='/api/assistant/query'&&req.method==='POST'){
-    const body=await readBody(req),question=String(body.question||'').trim(),config=await aiSettings();if(!question)return json(res,400,{error:'Задайте вопрос.'});if(!config?.apiKey)return json(res,409,{error:'ИИ-провайдер ещё не настроен.'});
-    try{return json(res,200,{text:await askProvider(config,question,String(body.context||'').slice(0,12000)),provider:config.provider});}catch(error){return json(res,502,{error:error.message});}
+    const body=await readBody(req),config=await aiSettings();if(!config?.apiKey)return json(res,409,{error:'ИИ-провайдер ещё не настроен.'});let messages;try{messages=buildProviderMessages(body);}catch(error){return json(res,400,{error:error.message});}
+    try{return json(res,200,{text:await askProvider(config,messages),provider:config.provider});}catch(error){return json(res,502,{error:error.message});}
   }
   return json(res,404,{error:'API route not found'});
 }
