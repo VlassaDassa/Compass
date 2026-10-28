@@ -102,6 +102,9 @@ export function createFurniture(kind,width,height,rotation=0){
   return pivot;
 }
 
+// Structural edges follow the surface they enclose, independently of UI accent.
+export function structuralEdgeColor(surface){return new T.Color(surface).lerp(new T.Color(0xffffff),.14);}
+
 export function createPlatform(width,height,depth,topColor,sideColor,borderColor=0x81729e){
   const top=new T.MeshStandardMaterial({color:topColor,roughness:.94}),side=new T.MeshStandardMaterial({color:sideColor,roughness:.8});
   const geometry=new T.BoxGeometry(width,height,depth),mesh=new T.Mesh(geometry,[side,side,side,side,top,side]);

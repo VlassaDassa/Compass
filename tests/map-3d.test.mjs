@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {createZoneWalls,createFurniture} from '../src/map-3d-models.js';
+import {createZoneWalls,createFurniture,structuralEdgeColor} from '../src/map-3d-models.js';
 import {doorWallPlacement,wallSegments} from '../dist/map-walls.js';
 import {sceneSvg,isoTransform,mapCaption,zoneCaptionPlacement} from '../dist/map-scene.js';
+
+test('map walls derive from the chosen surface, not the interface accent',()=>{const surface=new T.Color('#303139'),edge=structuralEdgeColor(surface);assert.ok(edge.r>surface.r&&edge.g>surface.g&&edge.b>surface.b);assert.equal(surface.getHexString(),'303139');assert.notEqual(edge.getHexString(),structuralEdgeColor('#886655').getHexString());});
 
 test('zone limits have low front walls and remain open where a corridor joins',()=>{
   const room={id:'r',x:0,y:0,width:500,height:400};const walls=createZoneWalls(room,[room]);assert.equal(walls.children.length,4);assert.deepEqual([...new Set(walls.children.map(m=>m.geometry.parameters.depth))].sort((a,b)=>a-b),[13,24]);

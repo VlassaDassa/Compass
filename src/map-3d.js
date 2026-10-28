@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {createFurniture,createPlatform,createZoneWalls} from './map-3d-models.js';
+import {createFurniture,createPlatform,createZoneWalls,structuralEdgeColor} from './map-3d-models.js';
 import {doorWallPlacement} from '../dist/map-walls.js';
 import {replaceCampusFloor} from '../dist/campus-model.js';
 
@@ -37,12 +37,12 @@ export function createOfficeRenderer(viewport){
   }
   function rebuild(floor,map){currentFloor=floor;currentMap=map;scene.remove(content);const previous=release(content);content=makeContent();entities=new Map();scene.add(content);
     const css=getComputedStyle(document.documentElement),theme=(key,fallback)=>{const value=css.getPropertyValue(key).trim();return /^#[\da-f]{6}$/i.test(value)?new T.Color(value):new T.Color(fallback);};
-    const accent=theme('--accent',0xc6c8ce),baseColor=theme('--map-base',0x151619),sideColor=baseColor.clone().multiplyScalar(.65),zoneBase=theme('--map-zone',0x303139),wallColor=zoneBase.clone().lerp(accent,.2);
+    const baseColor=theme('--map-base',0x151619),sideColor=baseColor.clone().multiplyScalar(.65),zoneBase=theme('--map-zone',0x303139),baseEdge=structuralEdgeColor(baseColor);
     for(const plan of floor.plans||[{floor,x:0,y:0,width:floor.width,height:floor.height}]){
     const local=plan.floor||{width:plan.width,height:plan.height,rooms:[],seats:[],objects:[]},platform=new T.Group();platform.position.set(plan.x,plan.y,0);content.add(platform);if(plan.building)entities.set('building:'+plan.building.id,platform);
-    const base=createPlatform(local.width,local.height,26,baseColor,sideColor,wallColor);base.position.z=-12;base.userData.mapTarget=plan.floor?{kind:'floor',id:local.id}:{kind:'building',id:plan.building.id};platform.add(base);if(plan.floor)entities.set('floor:'+local.id,base);
+    const base=createPlatform(local.width,local.height,26,baseColor,sideColor,baseEdge);base.position.z=-12;base.userData.mapTarget=plan.floor?{kind:'floor',id:local.id}:{kind:'building',id:plan.building.id};platform.add(base);if(plan.floor)entities.set('floor:'+local.id,base);
     const zoneColors={teal:0x35454a,amber:0x51463f,violet:0x443d5b,coral:0x514047,blue:0x35445a,stone:0x3c3d47};
-    const parents=new Map();for(const room of [...local.rooms].sort((a,b)=>Number(b.open)-Number(a.open))){const group=new T.Group();group.position.set(room.x,room.y,room.open?-4:0);group.userData.mapTarget={kind:'room',id:room.id};group.userData.floorId=local.id;const zone=zoneBase.clone().lerp(new T.Color(zoneColors[room.color]||zoneColors.stone),.16);group.add(createPlatform(room.width,room.height,room.open?8:12,zone,sideColor,wallColor),createZoneWalls(room,local.rooms,local.objects,wallColor));parents.set(room.id,group);entities.set('room:'+room.id,group);platform.add(group);}
+    const parents=new Map();for(const room of [...local.rooms].sort((a,b)=>Number(b.open)-Number(a.open))){const group=new T.Group();group.position.set(room.x,room.y,room.open?-4:0);group.userData.mapTarget={kind:'room',id:room.id};group.userData.floorId=local.id;const zone=zoneBase.clone().lerp(new T.Color(zoneColors[room.color]||zoneColors.stone),.16),wallColor=structuralEdgeColor(zone);group.add(createPlatform(room.width,room.height,room.open?8:12,zone,sideColor,wallColor),createZoneWalls(room,local.rooms,local.objects,wallColor));parents.set(room.id,group);entities.set('room:'+room.id,group);platform.add(group);}
     const add=(kind,item,mesh)=>{const g=new T.Group(),parent=parents.get(item.roomId);g.position.set(item.x,item.y,parent?0:-12);g.userData.mapTarget={kind,id:item.id};g.userData.floorId=local.id;g.add(mesh);(parent||platform).add(g);entities.set(kind+':'+item.id,g);};
     for(const seat of local.seats)add('seat',seat,createFurniture('workstation',seat.width??120,seat.height??75,seat.rotation||0));
     for(const object of local.objects||[]){const mesh=createFurniture(object.kind,object.width,object.height,object.rotation||0),attachment=doorWallPlacement(object,local.rooms);if(attachment)mesh.position.add(new T.Vector3(attachment.offset.x,attachment.offset.y,0));add('object',object,mesh);}
