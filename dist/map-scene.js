@@ -7,7 +7,8 @@ const short=(text,max)=>text.length>max?text.slice(0,Math.max(1,max-1))+'…':te
 const entityLabel={floor:'плана',room:'зоны',object:'объекта',seat:'рабочего места'};
 const ISO_X=.82,ISO_Y=.46,ISO_PADDING=120,ISO_DEPTH=28;
 export function isoTransform(floor,padding=floor.plans?180:ISO_PADDING){
-  const points=[[0,0],[floor.width,0],[0,floor.height],[floor.width,floor.height]].map(([x,y])=>({x:ISO_X*(x-y),y:ISO_Y*(x+y)}));
+  const x0=floor.minX??0,y0=floor.minY??0,x1=floor.maxX??floor.width,y1=floor.maxY??floor.height;
+  const points=[[x0,y0],[x1,y0],[x0,y1],[x1,y1]].map(([x,y])=>({x:ISO_X*(x-y),y:ISO_Y*(x+y)}));
   const xs=points.map(point=>point.x),ys=points.map(point=>point.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
   return{sx:ISO_X,sy:ISO_Y,ox:padding-minX,oy:padding-minY,width:maxX-minX+padding*2,height:maxY-minY+padding*2};
 }
@@ -46,17 +47,17 @@ function floorScene(plan,map,{escape,seatSvg},iso){
   const floor=plan.floor||{id:'',width:plan.width,height:plan.height,rooms:[],seats:[],objects:[]},e=escape,worldTransform=isoMatrix(iso)+` translate(${plan.x} ${plan.y})`;
   const floorPoints=pointsForRect(iso,plan.x,plan.y,floor.width,floor.height),target=plan.floor?{kind:'floor',id:floor.id}:{kind:'building',id:plan.building.id};
   const roomSvg=room=>{
-    const color=palette(room.color),selected=map.roomId===room.id&&!map.seatId&&!map.objectId,caption=zoneCaptionPlacement(room,floor.rooms);
+    const color=palette(room.color),selected=map.roomId===room.id&&!map.seatId&&!map.objectId,caption=zoneCaptionPlacement(room,floor.rooms),hideCaption=room.open||room.name.trim().toLocaleLowerCase('ru')==='коридор';
 
 
     const roomStyle=`--zone-ink:${color.ink};--zone-fill:${color.fill};--zone-header:${color.header}`;
-    return`<g class="office-room map-zone ${room.open?'open-zone':''} ${selected?'selected':''}" data-room-shape="${room.id}" data-map-kind="room" data-map-id="${room.id}" transform="translate(${room.x} ${room.y})" style="${roomStyle}"><rect class="office-room-bg" data-zone-body="true" width="${room.width}" height="${room.height}" rx="3" data-layout="select-room" data-room="${room.id}"/>${room.open?'':`<g data-room-drag="${room.id}" data-layout="select-room" data-room="${room.id}" role="button" tabindex="0" aria-label="Зона ${e(room.name)}">${mapCaption(room.name,caption.x,caption.y,iso,e,'room',caption.side)}</g>`}${map.editing?resizeHandles('room',room.id,room.width,room.height,selected):''}${floor.seats.filter(s=>s.roomId===room.id).map(seat=>seatSvg(seat,iso)).join('')}</g>`;
+    return`<g class="office-room map-zone ${room.open?'open-zone':''} ${selected?'selected':''}" data-room-shape="${room.id}" data-map-kind="room" data-map-id="${room.id}" transform="translate(${room.x} ${room.y})" style="${roomStyle}"><rect class="office-room-bg" data-zone-body="true" width="${room.width}" height="${room.height}" rx="3" data-layout="select-room" data-room="${room.id}"/>${hideCaption?'':`<g data-room-drag="${room.id}" data-layout="select-room" data-room="${room.id}" role="button" tabindex="0" aria-label="Зона ${e(room.name)}">${mapCaption(room.name,caption.x,caption.y,iso,e,'room',caption.side)}</g>`}${map.editing?resizeHandles('room',room.id,room.width,room.height,selected):''}${floor.seats.filter(s=>s.roomId===room.id).map(seat=>seatSvg(seat,iso)).join('')}</g>`;
   };
   const floorShell=`<g class="iso-floor-shell" aria-hidden="true"><path class="iso-floor-face" d="${pathPolygon([floorPoints[1],floorPoints[2],drop(floorPoints[2]),drop(floorPoints[1])])}"/><path class="iso-floor-face iso-floor-face-front" d="${pathPolygon([floorPoints[2],floorPoints[3],drop(floorPoints[3]),drop(floorPoints[2])])}"/><path class="iso-floor-edge" d="${pathPolygon(floorPoints)}"/></g>`;
   const roomShells=[...floor.rooms].sort((a,b)=>Number(b.open)-Number(a.open)).map(room=>{const color=palette(room.color),style=`--zone-ink:${color.ink};--zone-fill:${color.fill};--zone-header:${color.header}`;return extrusion(iso,pointsForRect(iso,plan.x+room.x,plan.y+room.y,room.width,room.height),`room ${room.open?'open':''}`,style);}).join('');
   const equipment=(floor.objects||[]).map(object=>{const parent=floor.rooms.find(room=>room.id===object.roomId);return`<g class="map-equipment-layer" transform="translate(${parent?.x||0} ${parent?.y||0})">${objectSvg(object,map,e,iso)}</g>`;}).join('');
   const world=`<g class="iso-world" data-plan-building="${plan.building?.id||''}" data-plan-floor="${floor.id}" data-plan-level="${plan.level||floor.number||''}" data-missing-floor="${!plan.floor}" transform="${worldTransform}"><rect class="map-floor-fill" data-map-kind="${target.kind}" data-map-id="${target.id}" data-layout="select-floor" data-id="${floor.id}" width="${floor.width}" height="${floor.height}" rx="4"/><rect class="map-edit-grid" width="${floor.width}" height="${floor.height}" fill="url(#office-dots)"/><rect class="map-floor-edge" data-floor-edge="true" width="${floor.width}" height="${floor.height}" rx="4" fill="none"/><text class="map-floor-label" data-floor-label="true" x="0" y="-23" transform="${readableLabel(iso,0,-23)}">ПЛАН · ${floor.width} × ${floor.height}</text>${map.editing&&plan.floor?resizeHandles('floor',floor.id,floor.width,floor.height,false):''}${[...floor.rooms].sort((a,b)=>Number(b.open)-Number(a.open)).map(roomSvg).join('')}${equipment}${plan.building?`<g class="map-building-label" data-map-kind="building" data-map-id="${plan.building.id}" role="button" tabindex="0" aria-label="Корпус ${e(plan.building.name)}">${mapCaption(plan.building.name,floor.width/2,0,iso,e,'building')}${!plan.floor?mapCaption('Нет этажа '+plan.level,floor.width/2,floor.height/2,iso,e,'missing'):''}</g>`:''}</g>`;
-  return`${floorShell}${roomShells}${world}`;
+  return`<g data-plan-shell="${plan.building?.id||''}">${floorShell}${roomShells}</g>${world}`;
 }
 function objectSvg(object,map,e,iso){
   const{width:w,height:h}=object,size=objectSize(object),color=palette(object.color||objectKinds[object.kind]?.color),rot=object.rotation||0,selected=map.objectId===object.id;

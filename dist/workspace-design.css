@@ -85,3 +85,25 @@ body:before{content:"";position:fixed;inset:0;z-index:1100;pointer-events:none;o
 .search-modal{border-radius:16px;overflow:hidden}.global-search-field{border-radius:12px 12px 0 0}.global-search-field input,.global-search-field input:focus{background:transparent;border:0;border-radius:8px;outline:none;box-shadow:none}.global-search-field kbd{background:var(--raised);border-color:var(--line);color:var(--muted);border-radius:6px}.global-search-field .icon-btn{border-radius:8px;color:var(--muted)}
 .chip-row .chip.active,.chip-row .chip.active:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}.chip-row .chip:hover{background:var(--raised);border-color:var(--line);color:var(--ink)}
 .guide-card .category-icon,.guide-card .category-icon:is(.green,.purple,.peach,.yellow,.pink){background:var(--accent-bg);color:var(--accent)}.guide-card .icon-btn.saved{background:var(--accent-bg);color:var(--accent)}
+/* Shared accent for interactive details, including vault and office controls. */
+.vault-record{border-left-color:var(--accent)}.vault-open,.copy-value svg,.copy-value:hover,.person-note-empty,.back-link,.prose a{color:var(--accent)}
+.vault-toolbar>[data-vault="add"],.vault-toolbar>[data-vault="add"]:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.office-viewport.isometric .map-move-grip rect{fill:var(--raised);stroke:var(--accent)}.office-viewport.isometric .map-move-grip path,.resize-selection,.map-resize-handle .handle-dot{stroke:var(--accent)}.map-resize-handle .handle-dot{fill:var(--accent)}.office-svg .map-resize-edge:hover,.office-svg .map-resize-edge:focus-visible{stroke:color-mix(in srgb,var(--accent) 35%,transparent)}.map-resize-invalid .resize-selection{stroke:#ffa89b}.map-resize-invalid .map-resize-edge:hover{stroke:#ff8c7d55}
+.ai-symbol,.ai-wrap .badge.purple{background:var(--accent-bg);border-color:var(--line);color:var(--accent)}.suggestion,.suggestion:hover{background:var(--accent-bg);border-color:color-mix(in srgb,var(--accent) 30%,var(--line));color:var(--ink)}.suggestion:hover{border-color:var(--accent)}
+.ai-composer{background:var(--field);border-color:var(--line)}.ai-composer:focus-within{border-color:var(--accent)}.ai-composer textarea,.ai-composer textarea:focus,.ai-composer textarea:focus-visible{resize:none;background:transparent;border:0;outline:none;box-shadow:none;color:var(--ink)}
+.ai-symbol svg,.suggestion svg,.ai-composer-bottom svg,.ai-message-heading,.ai-sources a{color:var(--accent)}.ai-composer-bottom{color:var(--muted)}.ai-message{background:var(--paper);border-color:var(--line);color:var(--ink)}
+/* Two independent, slowly moving contour layers stay behind the content. */
+.ambient-background:before{animation:compass-contour-flow 18s ease-in-out infinite alternate}
+body:after{content:"";position:fixed;inset:-25%;z-index:0;pointer-events:none;background:var(--accent);mask:url('/contours.svg') center/cover no-repeat;opacity:calc(var(--art-opacity,.14) * .55);animation:compass-contour-orbit 24s ease-in-out infinite alternate}
+@keyframes compass-contour-flow{from{transform:translate3d(3vw,-3vh,0) rotate(-5deg) scale(1.04)}to{transform:translate3d(-8vw,7vh,0) rotate(7deg) scale(1.12)}}
+@keyframes compass-contour-orbit{from{transform:translate3d(-5vw,4vh,0) rotate(12deg) scale(1.08)}to{transform:translate3d(7vw,-5vh,0) rotate(-9deg) scale(1.2)}}
+.topic-card,.guide-card,.person-card,.resource-card{transition:transform .24s ease,border-color .24s ease,background-color .24s ease}.topic-card:hover,.guide-card:hover,.person-card:hover,.resource-card:hover{transform:translateY(-3px)}.nav-link svg,.text-link svg,.btn svg{transition:transform .2s ease}.nav-link:hover svg,.text-link:hover svg{transform:translateX(3px)}.btn:hover svg{transform:scale(1.08)}
+html[data-motion=false] .ambient-background:before,html[data-motion=false] body:after{animation:none}
+html[data-motion=false] :is(.topic-card,.guide-card,.person-card,.resource-card,.nav-link svg,.text-link svg,.btn svg){transition:none}html[data-motion=false] :is(.topic-card,.guide-card,.person-card,.resource-card):hover,html[data-motion=false] :is(.nav-link,.text-link,.btn):hover svg{transform:none}
+@media(prefers-reduced-motion:reduce){.ambient-background:before,body:after{animation:none}:is(.topic-card,.guide-card,.person-card,.resource-card,.nav-link svg,.text-link svg,.btn svg){transition:none}:is(.topic-card,.guide-card,.person-card,.resource-card):hover,:is(.nav-link,.text-link,.btn):hover svg{transform:none}}
+/* The header is a complete rounded surface, aligned with the sidebar. */
+.topbar{margin:12px 16px 0;top:12px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.map-workspace .content{height:calc(100dvh - 84px)}
+@media(max-width:760px){.topbar{margin:8px 10px 0;top:8px;border-radius:12px}.map-workspace .content{height:auto}}
+/* Main content is a programmatic skip-link target, not an interactive control. */
+#main-content:focus-visible{outline:none}

@@ -6,8 +6,9 @@ export function campusScene(office,level){
   const slots=buildings.map(building=>{const floors=office.floors.filter(f=>f.buildingId===building.id);return{building,width:Math.max(1000,...floors.map(f=>f.width)),height:Math.max(680,...floors.map(f=>f.height)),floor:floors.find(f=>f.number===level)||null};});
   const colWidths=Array.from({length:columns},(_,col)=>Math.max(0,...slots.filter((_,i)=>i%columns===col).map(s=>s.width))),rows=Math.ceil(slots.length/columns);
   const rowHeights=Array.from({length:rows},(_,row)=>Math.max(0,...slots.slice(row*columns,(row+1)*columns).map(s=>s.height)));
-  const plans=slots.map((slot,i)=>({...slot,level,x:colWidths.slice(0,i%columns).reduce((a,b)=>a+b+gap,0),y:rowHeights.slice(0,Math.floor(i/columns)).reduce((a,b)=>a+b+gap,0),width:slot.floor?.width||slot.width,height:slot.floor?.height||slot.height}));
-  return{id:'campus',level,plans,width:Math.max(400,...plans.map(p=>p.x+p.width)),height:Math.max(350,...plans.map(p=>p.y+p.height)),rooms:[],seats:[],objects:[]};
+  const plans=slots.map((slot,i)=>({...slot,level,x:Number.isFinite(slot.building.position?.x)?slot.building.position.x:colWidths.slice(0,i%columns).reduce((a,b)=>a+b+gap,0),y:Number.isFinite(slot.building.position?.y)?slot.building.position.y:rowHeights.slice(0,Math.floor(i/columns)).reduce((a,b)=>a+b+gap,0),width:slot.floor?.width||slot.width,height:slot.floor?.height||slot.height}));
+  const minX=Math.min(0,...plans.map(p=>p.x)),minY=Math.min(0,...plans.map(p=>p.y)),maxX=Math.max(400,...plans.map(p=>p.x+p.width)),maxY=Math.max(350,...plans.map(p=>p.y+p.height));
+  return{id:'campus',level,plans,minX,minY,maxX,maxY,width:maxX-minX,height:maxY-minY,rooms:[],seats:[],objects:[]};
 }
 export function sourceFloorFor(office,kind,id){return office.floors.find(f=>kind==='floor'?f.id===id:(kind==='room'?f.rooms:kind==='seat'?f.seats:kind==='object'?f.objects:[])?.some(item=>item.id===id));}
 export function replaceCampusFloor(scene,floor){return{...scene,plans:scene.plans.map(plan=>plan.floor?.id===floor.id?{...plan,floor,width:floor.width,height:floor.height}:plan)};}

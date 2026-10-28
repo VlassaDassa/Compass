@@ -2,7 +2,7 @@ import {snapSeatPosition,validateSeatPosition,snapObjectPosition,validateObject,
 import {resizeLayout,validateLayoutResize} from './map-resize.js';
 
 /** SVG coordinates stay independent of screen size and the current zoom. */
-export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,previewEntity,pick,activate,select,render,report,isActive}){
+export function attachCanvasGestures({svg,map,getFloor,getBuilding,toWorld,zoom,applyCamera,saveBuilding,previewBuilding,saveSeat,saveRoom,saveObject,saveResize,previewResize,previewRoom,previewEntity,pick,activate,select,render,report,isActive}){
   let drag=null,pinch=null;
   const screenPoint=point=>point.view||point;
   const targetAt=event=>{
@@ -12,6 +12,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     return pick?.(event.clientX,event.clientY)||null;
   };
   const preview=()=>{
+    if(drag?.building)previewBuilding?.(drag.building.id,drag.building);
     if(drag?.seat){
       const el=svg.querySelector(`[data-seat="${drag.seat.id}"]`);
       el?.setAttribute('transform',`translate(${drag.seat.x} ${drag.seat.y})`);
@@ -55,7 +56,8 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     const collection=resizeKind==='room'?floor.rooms:resizeKind==='seat'?floor.seats:floor.objects;
     const sized=handle&&resizeKind!=='floor'?collection?.find(r=>r.id===handle.dataset.resizeId):null;
     const resizeItem=resizeKind==='floor'?floor:sized;
-    drag={target:hit,sourceFloor:floor,start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,floor:handle?structuredClone(floor):null,resize:handle&&resizeItem?{kind:resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis}:null};
+    const building=editable&&!handle&&!seatId&&!objectId&&!roomId?getBuilding?.(hit):null;
+    drag={target:hit,sourceFloor:floor,start:{x:event.clientX,y:event.clientY},camera:{...map.camera},point,building,seat:seatId?structuredClone(floor.seats.find(s=>s.id===seatId)):null,room:roomId?structuredClone(floor.rooms.find(r=>r.id===roomId)):null,object:objectId?structuredClone(floor.objects.find(o=>o.id===objectId)):null,floor:handle?structuredClone(floor):null,resize:handle&&resizeItem?{kind:resizeKind,id:handle.dataset.resizeId,axis:handle.dataset.resizeAxis}:null};
     if(handle)select?.(resizeKind,resizeItem.id);
     else if(seatId)select?.('seat',seatId);
     else if(objectId)select?.('object',objectId);
@@ -66,7 +68,7 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     }
   });
   svg.addEventListener('pointermove',event=>{
-    if(!map.gestures.has(event.pointerId)){if(pick&&map.editing&&!map.spacePanning){const hit=targetAt(event);svg.style.cursor=hit&&['seat','object'].includes(hit.kind)?'grab':'';}return;}
+    if(!map.gestures.has(event.pointerId)){if(pick&&map.editing&&!map.spacePanning){const hit=targetAt(event);svg.style.cursor=hit&&['seat','object','room','floor','building'].includes(hit.kind)?'grab':'';}return;}
     map.gestures.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(map.gestures.size===2&&pinch){
       const [a,b]=[...map.gestures.values()],distance=Math.hypot(a.x-b.x,a.y-b.y);
@@ -81,7 +83,10 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     if(Math.hypot(dx,dy)>5)map.moved=true;
     if(!map.moved)return;
     map.dragging=true;
-    if(drag.resize){
+    if(drag.building){
+      drag.nextBuilding={id:drag.building.id,x:Math.max(-100000,Math.min(100000,Math.round((drag.building.x+worldDx)/20)*20)),y:Math.max(-100000,Math.min(100000,Math.round((drag.building.y+worldDy)/20)*20))};
+      previewBuilding?.(drag.building.id,drag.nextBuilding);report('Перемещение корпуса');
+    }else if(drag.resize){
       const item=drag.resize;
       drag.nextResize=resizeLayout(drag.floor,item.kind,item.id,item.axis,worldDx,worldDy);drag.error='';
       try{validateLayoutResize(drag.nextResize);}catch(error){drag.error=error.message;}
@@ -132,7 +137,9 @@ export function attachCanvasGestures({svg,map,getFloor,toWorld,zoom,applyCamera,
     if(!moved||!finished){if(finished?.target&&!finished.resize)activate?.(finished.target.kind,finished.target.id);return;}
     try{
       if(finished.error)throw new Error(finished.error);
-      if(finished.nextResize){
+      if(finished.nextBuilding){
+        await saveBuilding(finished.nextBuilding);if(isActive()){render();report('Положение корпуса сохранено');}
+      }else if(finished.nextResize){
         await saveResize(finished.nextResize);
         if(isActive()){render();report(`Размер сохранён · ${finished.nextResize.width} × ${finished.nextResize.height}`);}
       }else if(finished.nextObject){

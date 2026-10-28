@@ -36,6 +36,7 @@ test('stairs are an actual stepped 3D mesh with an elevated landing and handrail
 test('zone plaques sit wholly outside the north edge and open corridors have no label',()=>{
   const floor={id:'f',width:1000,height:680,objects:[],seats:[],rooms:[{id:'r',name:'Команда',x:20,y:30,width:500,height:400},{id:'c',name:'Коридор',x:20,y:450,width:500,height:100,open:true}]};
   const svg=sceneSvg(floor,{},{escape:s=>s,seatSvg:()=>''});assert.ok(svg.includes('Команда'));assert.ok(!svg.includes('Коридор'));assert.equal((svg.match(/caption-room/g)||[]).length,1);
+  const closedCorridor={...floor,rooms:[floor.rooms[0],{...floor.rooms[1],open:false,name:' КОРИДОР '}]};const closedSvg=sceneSvg(closedCorridor,{},{escape:s=>s,seatSvg:()=>''});assert.ok(!closedSvg.includes('КОРИДОР'));assert.equal((closedSvg.match(/caption-room/g)||[]).length,1);
   const label=mapCaption('Команда',250,0,isoTransform(floor),s=>s);assert.ok(label.includes('y="-64"'));assert.ok(label.includes('height="25"'));
   const front={id:'front',x:20,y:450,width:500,height:100};assert.equal(zoneCaptionPlacement(front,[floor.rooms[0],front]).side,'s','the label avoids a nearby zone behind it');
 });
