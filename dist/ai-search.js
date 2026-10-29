@@ -1,0 +1,5 @@
+const stop=new Set(['когда','после','почему','чтобы','который','которая','такое','такой','нужно','можно','проблема','ошибка','помоги','помощь','пожалуйста','что','как','для','это','при','уже','меня','него','нее','есть','если','было','были','сделать','работает','работать','через','прошу','помочь','проверить']);
+export function findRelevantArticles(question,articles,toText){
+ const terms=[...new Set((question.toLocaleLowerCase('ru').match(/[а-яёa-z0-9]{4,}/g)||[]).filter(t=>!stop.has(t)))].slice(0,30);if(!terms.length)return[];
+ return articles.filter(a=>a.status==='published').map(a=>{const title=String(a.title||'').toLocaleLowerCase('ru'),all=(title+' '+(a.summary||'')+' '+(a.tags||[]).join(' ')+' '+toText(a.body||'')).toLocaleLowerCase('ru');const hits=terms.filter(t=>all.includes(t)),titleHits=terms.filter(t=>title.includes(t)).length;return{a,hits:hits.length,titleHits,score:hits.length+titleHits*2};}).filter(x=>terms.length===1?x.titleHits>0:x.hits>=2&&x.hits/terms.length>=.35).sort((a,b)=>b.score-a.score).slice(0,4).map(x=>x.a);
+}

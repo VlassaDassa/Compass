@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {findRelevantArticles} from '../dist/ai-search.js';
+const articles=[{id:'mail',status:'published',title:'Outlook не подключается к почте',summary:'Профиль Outlook и проверка почты',body:'',tags:[]},{id:'net',status:'published',title:'Сеть и подключение',summary:'Проверка кабеля',body:'',tags:[]}];
+test('returns relevant article and excludes unrelated single common word matches',()=>{assert.equal(findRelevantArticles('Outlook не подключается к почте',articles,x=>x)[0].id,'mail');assert.deepEqual(findRelevantArticles('В адресной книге Outlook неверная фамилия сотрудника Exchange',articles,x=>x),[]);assert.deepEqual(findRelevantArticles('помоги решить проблему',articles,x=>x),[]);});

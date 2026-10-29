@@ -15,6 +15,7 @@ services:
       COMPASS_SECRET: ${COMPASS_SECRET:?Run bash scripts/setup-docker.sh first}
       COMPASS_AUTH_USER: ${COMPASS_AUTH_USER:-admin}
       COMPASS_AUTH_PASSWORD: ${COMPASS_AUTH_PASSWORD:?Run bash scripts/setup-docker.sh first}
+      COMPASS_WEB_SEARCH_URL: ${COMPASS_WEB_SEARCH_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +40,24 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  search:
+    image: searxng/searxng:latest
+    profiles: ["web-search"]
+    restart: unless-stopped
+    environment:
+      SEARXNG_SETTINGS_PATH: /etc/compass-searx/settings.yml
+      SEARXNG_SECRET: ${COMPASS_SEARCH_SECRET:-}
+      SEARXNG_BIND_ADDRESS: 0.0.0.0
+      SEARXNG_PORT: 8080
+      SEARXNG_LIMITER: "false"
+      SEARXNG_PUBLIC_INSTANCE: "false"
+    volumes:
+      - ./deploy/searxng-settings.yml:/etc/compass-searx/settings.yml:ro
     logging:
       driver: json-file
       options:
