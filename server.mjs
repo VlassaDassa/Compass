@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import {buildProviderMessages} from './dist/ai-prompts.js';
 import {searchWeb} from './dist/web-search.js';
+import {createAuth} from './auth.mjs';
 const root = path.resolve(fileURLToPath(new URL('./dist/', import.meta.url)));
 const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.svg':'image/svg+xml', '.json':'application/json; charset=utf-8', '.woff2':'font/woff2' };
 const port = Number(process.env.PORT || 4173);
@@ -14,6 +15,7 @@ const production=process.env.NODE_ENV==='production';
 const username=process.env.COMPASS_AUTH_USER||'admin',password=process.env.COMPASS_AUTH_PASSWORD||'';
 if(production&&(!databaseUrl||!process.env.COMPASS_SECRET||!password))throw new Error('Production requires COMPASS_DATABASE_URL, COMPASS_SECRET and COMPASS_AUTH_PASSWORD.');
 const pool = databaseUrl ? new Pool({connectionString:databaseUrl,connectionTimeoutMillis:5000,ssl:process.env.COMPASS_DB_SSL==='true'?{rejectUnauthorized:true}:undefined}) : null;
+const auth=pool?createAuth(pool,{secure:(process.env.COMPASS_PUBLIC_URL||'').startsWith('https://')}):null;
 pool?.on('error',error=>console.error('PostgreSQL pool:',error.message));
 let databaseState = databaseUrl ? 'connecting' : 'not_configured';
 
@@ -21,7 +23,7 @@ const schema=await readFile(new URL('./docs/runtime-schema.sql',import.meta.url)
 
 async function initializeDatabase(){
   if(!pool)return;
-  try{await pool.query(schema);databaseState='connected';}
+  try{await pool.query(schema);if(password)await auth.bootstrap(username,password);databaseState='connected';}
   catch(error){databaseState='error';console.error('PostgreSQL is unavailable:',error.message);if(production)throw error;}
 }
 const json=(res,status,payload)=>{const body=JSON.stringify(payload);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(body);};
@@ -35,8 +37,9 @@ function providerConfig(input){const provider=['gigachat','openai','custom'].inc
 async function gigachatToken(apiKey){const response=await fetch('https://ngw.devices.sberbank.ru:9443/api/v2/oauth',{method:'POST',headers:{Authorization:`Basic ${apiKey}`,RqUID:crypto.randomUUID(),'Content-Type':'application/x-www-form-urlencoded'},body:'scope=GIGACHAT_API_PERS'});if(!response.ok)throw new Error(`GigaChat OAuth: ${response.status}`);const data=await response.json();return data.access_token;}
 async function askProvider(config,messages){
   const token=config.provider==='gigachat'?await gigachatToken(config.apiKey):config.apiKey;
-  const response=await fetch(`${config.baseUrl}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,messages,temperature:.2})});
-  const text=await response.text();if(!response.ok)throw new Error(`${config.provider}: ${response.status} ${text.slice(0,300)}`);let data;try{data=JSON.parse(text);}catch{throw new Error('Провайдер вернул некорректный ответ');}return data.choices?.[0]?.message?.content||'Провайдер не вернул текст ответа.';
+  const body={model:config.model,messages,temperature:.2};if(config.provider==='gigachat')body.function_call='none';
+  const response=await fetch(`${config.baseUrl}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const text=await response.text();if(!response.ok)throw new Error(`${config.provider}: ${response.status} ${text.slice(0,300)}`);let data;try{data=JSON.parse(text);}catch{throw new Error('Провайдер вернул некорректный ответ');}const content=data.choices?.[0]?.message?.content;if(typeof content!=='string'||!content.trim())throw new Error('ИИ не вернул текст. Попробуйте ещё раз или выберите другую модель в настройках.');return content.trim();
 }
 async function api(req,res,pathname){
   if((pathname==='/api/status'||pathname==='/api/health')&&req.method==='GET'){
@@ -45,6 +48,15 @@ async function api(req,res,pathname){
   }
   if(!pathname.startsWith('/api/'))return false;
   if(databaseState!=='connected')return json(res,503,{error:'PostgreSQL не настроен или недоступен.',database:databaseState});
+  if(pathname==='/api/auth/login'&&req.method==='POST'){const body=await readBody(req),session=await auth.login(req,body||{});if(!session)return json(res,401,{error:'Неверный логин или пароль.'});res.setHeader('Set-Cookie',session.cookie);return json(res,200,{user:session.user});}
+  if(pathname==='/api/auth/session'&&req.method==='GET'){const user=await auth.current(req);return user?json(res,200,{user}):json(res,401,{error:'Требуется вход.'});}
+  if(pathname==='/api/auth/logout'&&req.method==='POST'){await auth.logout(req);res.setHeader('Set-Cookie',auth.clearCookie());return json(res,200,{ok:true});}
+  const user=await auth.current(req);if(!user)return json(res,401,{error:'Требуется вход.'});
+  if(pathname==='/api/users'||pathname.startsWith('/api/users/')||pathname==='/api/ai/settings'){if(user.role!=='admin')return json(res,403,{error:'Доступно только администратору.'});}
+  if(pathname==='/api/users'&&req.method==='GET')return json(res,200,{users:await auth.list()});
+  if(pathname==='/api/users'&&req.method==='POST'){const body=await readBody(req);try{return json(res,201,{user:await auth.create(body||{})});}catch(error){if(error.code==='23505')return json(res,409,{error:'Пользователь с таким логином уже существует.'});if(error.status||!error.code)return json(res,error.status||400,{error:error.message});throw error;}}
+  const userMatch=pathname.match(/^\/api\/users\/([a-zA-Z0-9-]+)$/);
+  if(userMatch&&['PATCH','DELETE'].includes(req.method)){const body=req.method==='PATCH'?await readBody(req):{};try{await auth.change(userMatch[1],body||{},user,req.method==='DELETE');return json(res,200,{ok:true});}catch(error){if(error.status||!error.code)return json(res,error.status||400,{error:error.message});throw error;}}
   if(pathname==='/api/state'&&req.method==='GET'){
     const result=await pool.query('SELECT state,revision FROM compass_workspace_state WHERE workspace_id=$1',['default']);
     return result.rows[0]?json(res,200,{state:result.rows[0].state,revision:result.rows[0].revision}):json(res,404,{state:null});
@@ -71,18 +83,9 @@ async function api(req,res,pathname){
   }
   return json(res,404,{error:'API route not found'});
 }
-function authorized(req,res){
-  if(!password)return true;
-  const supplied=String(req.headers.authorization||'').replace(/^Basic /i,'');
-  let decoded='';try{decoded=Buffer.from(supplied,'base64').toString('utf8');}catch{}
-  const digest=value=>crypto.createHash('sha256').update(value).digest();
-  if(crypto.timingSafeEqual(digest(decoded),digest(username+':'+password)))return true;
-  res.writeHead(401,{'WWW-Authenticate':'Basic realm="Compass", charset="UTF-8"','Cache-Control':'no-store'}).end('Authentication required');return false;
-}
 const server = http.createServer(async (req,res) => {
   try {
-    if(!authorized(req,res))return;
-    if(!['GET','HEAD','OPTIONS'].includes(req.method)&&req.headers.origin){const allowed=process.env.COMPASS_PUBLIC_URL||('http://'+req.headers.host);if(req.headers.origin!==allowed){json(res,403,{error:'Недопустимый источник запроса.'});return;}}
+    if(!['GET','HEAD','OPTIONS'].includes(req.method)){const allowed=process.env.COMPASS_PUBLIC_URL||('http://'+req.headers.host);if((req.headers.origin&&req.headers.origin!==allowed)||req.headers['sec-fetch-site']==='cross-site'){json(res,403,{error:'Недопустимый источник запроса.'});return;}if(!String(req.headers['content-type']||'').toLowerCase().startsWith('application/json')){json(res,415,{error:'Требуется JSON-запрос.'});return;}}
     res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','SAMEORIGIN');
     const pathname = decodeURIComponent(new URL(req.url,'http://localhost').pathname);
     if(pathname.startsWith('/api/')){await api(req,res,pathname);return;}
@@ -90,7 +93,7 @@ const server = http.createServer(async (req,res) => {
     if(!target.startsWith(root + path.sep) && target !== path.join(root,'index.html')) {res.writeHead(403).end();return;}
     const body = await readFile(target);
     res.writeHead(200, {'Content-Type':types[path.extname(target)] || 'application/octet-stream','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}).end(body);
-  } catch(error) {if(!res.headersSent)json(res,error.message==='Request is too large'?413:error.message==='Invalid JSON'?400:error.code==='ENOENT'?404:500,{error:error.message||'Server error'});}
+  } catch(error) {if(!res.headersSent)json(res,error.status|| (error.message==='Request is too large'?413:error.message==='Invalid JSON'?400:error.code==='ENOENT'?404:500),{error:error.status||['Request is too large','Invalid JSON'].includes(error.message)?error.message:'Ошибка сервера.'});}
 });
 await initializeDatabase();
 server.listen(port,process.env.HOST||'127.0.0.1',()=>console.log(`Local: http://127.0.0.1:${port} · PostgreSQL: ${databaseState}`));

@@ -1,0 +1,14 @@
+export let currentUser=null;
+export let staticMode=false;
+const escape=value=>String(value||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export async function authRequest(path,options={}){const response=await fetch(path,{...options,headers:{...(options.method&&options.method!=='GET'?{'Content-Type':'application/json'}:{}),...options.headers},cache:'no-store'});const payload=await response.json().catch(()=>({}));if(!response.ok)throw Object.assign(new Error(payload.error||'Не удалось выполнить запрос.'),{status:response.status});return payload;}
+export async function ensureSession(){
+ const status=await fetch('/api/status',{cache:'no-store'});if(status.status===404||status.ok&&!status.headers.get('content-type')?.includes('application/json')){staticMode=true;return;}if(!status.ok)throw new Error('Не удалось подключиться к серверу авторизации.');const statusData=await status.json();if(statusData.runtime!=='server'){staticMode=true;return;}
+ const response=await fetch('/api/auth/session',{cache:'no-store'});
+ if(response.ok){const data=await response.json();currentUser=data.user;return;}
+ if(response.status!==401)throw new Error('Не удалось подключиться к серверу авторизации.');
+ const app=document.querySelector('#app');app.innerHTML=`<main class="login-page"><section class="login-card"><div class="login-mark" aria-hidden="true">◈</div><p class="login-kicker">КОМПАС / РАБОЧЕЕ ПРОСТРАНСТВО</p><h1>С возвращением.</h1><p class="login-description">Войдите в базу знаний вашей команды.</p><form id="login-form"><div class="field"><label for="login-name">Логин</label><input id="login-name" name="username" autocomplete="username" maxlength="160" required autofocus></div><div class="field"><label for="login-password">Пароль</label><input id="login-password" name="password" type="password" autocomplete="current-password" maxlength="1024" required></div><p id="login-error" class="login-error" role="alert"></p><button class="btn btn-primary login-submit" type="submit">Войти</button></form></section></main>`;
+ await new Promise(resolve=>{const form=document.querySelector('#login-form'),error=document.querySelector('#login-error');form.addEventListener('submit',async event=>{event.preventDefault();const button=form.querySelector('button');button.disabled=true;error.textContent='';try{const data=await authRequest('/api/auth/login',{method:'POST',body:JSON.stringify({login:form.elements.username.value,password:form.elements.password.value})});currentUser=data.user;form.elements.password.value='';resolve();}catch(e){error.textContent=e.message;}finally{button.disabled=false;}});});
+}
+export async function signOut(){await authRequest('/api/auth/logout',{method:'POST',body:'{}'});location.reload();}
+export function userLabel(){return escape(currentUser?.name||'Рабочее пространство');}

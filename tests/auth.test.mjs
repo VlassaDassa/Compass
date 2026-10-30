@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {hashPassword,verifyPassword,readSessionCookie,sessionCookie} from '../auth.mjs';
+test('password hashes are salted and verify without storing plaintext',async()=>{const password='long-unique-password',a=await hashPassword(password),b=await hashPassword(password);assert.notEqual(a,b);assert.ok(!a.includes(password));assert.equal(await verifyPassword(password,a),true);assert.equal(await verifyPassword('wrong',a),false);assert.equal(await verifyPassword(password,'bad'),false);});
+test('session cookie is opaque, httpOnly and secure for HTTPS',()=>{const token='a'.repeat(43),header=sessionCookie(token,true);assert.match(header,/HttpOnly/);assert.match(header,/SameSite=Lax/);assert.match(header,/Secure/);assert.equal(readSessionCookie('other=hello; '+header),token);assert.equal(readSessionCookie('compass_session=bad'), '');assert.match(sessionCookie('',true,0),/Max-Age=0/);});
